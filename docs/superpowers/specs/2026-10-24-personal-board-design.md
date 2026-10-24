@@ -1,7 +1,7 @@
 # atlassian-notes: personal board (phase 2a), design
 
 Date: 2026-10-24
-Status: draft for approval
+Status: approved
 Builds on: `docs/superpowers/specs/2026-10-24-jira-refinement-notes-design.md` (phase 1, shipped). Everything there still applies: privacy, GET-only Jira, localhost only, data outside the app folder, config in files.
 
 ## Intent
