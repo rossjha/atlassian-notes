@@ -265,6 +265,10 @@ body {
   .dr-note { border: 1px dashed var(--dim); border-radius: var(--r-sm); padding: 0.4rem 0.6rem; min-height: 6rem; }
   .dr-note.dr-editable { cursor: text; }
   .dr-note .editor-wrap { width: 100%; max-width: none; }
+  /* Editing in the drawer: the note box itself becomes the active (solid accent) border and the textarea is borderless,
+     so there is one border, not two, and the text stays where it was. */
+  .dr-note:has(.editor-wrap) { border-style: solid; border-color: var(--accent); }
+  .dr-note .editor-area { border: 0; padding: 0; background: transparent; border-radius: 0; }
   .dr-groom { background: color-mix(in srgb, var(--chart-3) 8%, transparent); border: 1px solid color-mix(in srgb, var(--chart-3) 35%, transparent); border-radius: var(--r-sm); padding: 0.4rem 0.6rem; }
   .dr-groom-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; font-size: 11px; }
   .dr-path { display: block; margin-top: 0.3rem; font-size: 11px; color: var(--muted); }
