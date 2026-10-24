@@ -130,7 +130,10 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
 
   function sendWrite(res: http.ServerResponse, r: WriteResult): void {
     if (r.ok) return send(res, 200, { mtimeMs: r.mtimeMs });
-    if (r.reason === "conflict") return send(res, 409, { current: r.conflict });
+    if (r.reason === "conflict") {
+      if (r.conflict === null) return send(res, 409, { current: null, error: "This note was deleted on disk since you opened it" });
+      return send(res, 409, { current: r.conflict });
+    }
     send(res, 422, { error: `${r.conflict?.key ?? "Note"}: front matter could not be parsed; fix the file by hand` });
   }
 

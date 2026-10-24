@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { NotesStore } from "../src/server/notesStore.ts";
+import { NotesStore, atomicWrite } from "../src/server/notesStore.ts";
 import { InvalidKeyError, parseFrontMatter } from "../src/server/frontMatter.ts";
 
 let dir: string;
@@ -47,6 +47,34 @@ test("stale base mtime gives conflict, file untouched; force succeeds", async ()
   const forced = await store.writeNoteBody("PAY-1", "later", { baseMtimeMs: first.mtimeMs, force: true });
   assert.equal(forced.ok, true);
   assert.equal((await store.readNote("PAY-1"))?.body, "later");
+});
+
+test("save with a base mtime after the file was deleted on disk conflicts and recreates nothing", async () => {
+  const first = await store.writeNoteBody("PAY-1", "mine", { baseMtimeMs: null });
+  assert.ok(first.ok);
+  await fs.rm(store.notePath("PAY-1"));
+  const r = await store.writeNoteBody("PAY-1", "later", { baseMtimeMs: first.mtimeMs });
+  assert.ok(!r.ok && r.reason === "conflict");
+  assert.equal(!r.ok && r.conflict, null);
+  assert.equal(await store.readNote("PAY-1"), null);
+  const forced = await store.writeNoteBody("PAY-1", "later", { baseMtimeMs: first.mtimeMs, force: true });
+  assert.equal(forced.ok, true);
+  assert.equal((await store.readNote("PAY-1"))?.body, "later");
+});
+
+test("concurrent atomicWrite calls to the same file all succeed and leave no tmp files", async () => {
+  const file = path.join(dir, "views.yaml");
+  const results = await Promise.allSettled(Array.from({ length: 16 }, (_, i) => atomicWrite(file, `v${i}\n`)));
+  assert.deepEqual(results.filter((r) => r.status === "rejected"), []);
+  assert.match(await fs.readFile(file, "utf8"), /^v\d+\n$/);
+  assert.deepEqual((await fs.readdir(dir)).filter((n) => n.includes(".tmp-")), []);
+});
+
+test("atomicWrite removes its tmp file when the rename fails", async () => {
+  const target = path.join(dir, "adir");
+  await fs.mkdir(path.join(target, "child"), { recursive: true });
+  await assert.rejects(atomicWrite(target, "x"));
+  assert.deepEqual((await fs.readdir(dir)).filter((n) => n.includes(".tmp-")), []);
 });
 
 test("null base mtime with existing file conflicts", async () => {

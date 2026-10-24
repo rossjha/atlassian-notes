@@ -128,6 +128,19 @@ test("note save creates file with jira_id; stale base after external edit is 409
   assert.equal(rows.rows[0].note.body.trim(), "mine");
 });
 
+test("note save after the note was deleted on disk is 409 with a readable error and recreates nothing", async () => {
+  const res = await put("/api/notes/PAY-2", { body: "first", baseMtimeMs: null });
+  const { mtimeMs } = await res.json();
+  const file = path.join(dir, "jira", "notes", "PAY-2.md");
+  fs.rmSync(file);
+  const r = await put("/api/notes/PAY-2", { body: "mine", baseMtimeMs: mtimeMs });
+  assert.equal(r.status, 409);
+  const body = await r.json();
+  assert.equal(body.current, null);
+  assert.match(body.error, /deleted on disk/);
+  assert.equal(fs.existsSync(file), false);
+});
+
 test("field writes: valid custom field ok, bad key/builtin/bad value rejected", async () => {
   assert.equal((await put("/api/notes/..%2Fx/fields/category", { value: "a" })).status, 400);
   assert.equal((await put("/api/notes/PAY-1/fields/status", { value: "a" })).status, 400);

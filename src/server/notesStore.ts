@@ -11,11 +11,20 @@ export type WriteResult =
 
 type Kind = "notes" | "groom";
 
+let tmpCounter = 0;
+
 export async function atomicWrite(file: string, content: string): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  await fs.writeFile(tmp, content, "utf8");
-  await fs.rename(tmp, file);
+  // Unique per call so concurrent writes to the same file never share a tmp file.
+  // The watcher ignores names containing ".tmp-".
+  const tmp = `${file}.tmp-${process.pid}-${++tmpCounter}-${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    await fs.writeFile(tmp, content, "utf8");
+    await fs.rename(tmp, file);
+  } catch (e) {
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw e;
+  }
 }
 
 function isMissing(e: unknown): boolean {
@@ -74,6 +83,8 @@ export class NotesStore {
     const file = this.notePath(key);
     const existing = await this.readFile("notes", key);
     if (!existing) {
+      // The editor had a version of this file, but it is gone now (deleted on disk): don't silently recreate it.
+      if (opts.baseMtimeMs !== null && !opts.force) return { ok: false, conflict: null, reason: "conflict" };
       const data: Record<string, unknown> = { key };
       if (opts.jiraId !== undefined) data.jira_id = opts.jiraId;
       return this.write(file, stringifyFrontMatter(data, body));
@@ -194,11 +205,21 @@ export class NotesStore {
 
   private async readFile(kind: Kind, key: string): Promise<NoteFile | null> {
     const file = this.pathFor(kind, key);
-    let text: string;
-    let mtimeMs: number;
+    let text = "";
+    let mtimeMs = 0;
     try {
-      text = await fs.readFile(file, "utf8");
-      mtimeMs = (await fs.stat(file)).mtimeMs;
+      // Read and stat through one handle (same inode), and retry once if it changed mid-read.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const fh = await fs.open(file, "r");
+        try {
+          const before = (await fh.stat()).mtimeMs;
+          text = await fh.readFile("utf8");
+          mtimeMs = (await fh.stat()).mtimeMs;
+          if (before === mtimeMs) break;
+        } finally {
+          await fh.close();
+        }
+      }
     } catch (e) {
       if (isMissing(e)) return null;
       throw e;
