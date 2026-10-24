@@ -2,6 +2,7 @@ import type { ColumnsConfig, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api } from "./api.ts";
 import { h, relativeTime } from "./dom.ts";
+import { isEditing, onEditorsIdle } from "./editors.ts";
 import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 
@@ -36,6 +37,25 @@ const handlers: TableHandlers = {
       ? { columnId, dir: sort.dir === "asc" ? "desc" : "asc" }
       : { columnId, dir: "asc" };
     renderBody();
+  },
+  onToggleDisplay(columnId) {
+    const view = activeView();
+    if (!view) return;
+    const next = views.map((v) =>
+      v.id !== view.id
+        ? v
+        : { ...v, columns: v.columns.map((c) => (c.id === columnId ? { ...c, display: c.display === "expand" ? "truncate" as const : "expand" as const } : c)) },
+    );
+    void api.saveViews(next).then(
+      () => {
+        views = next;
+        renderBody();
+      },
+      (e: Error) => {
+        rowsError = e.message;
+        renderChrome();
+      },
+    );
   },
   onNoteSaved: () => void loadRows(),
 };
@@ -95,7 +115,18 @@ function renderChrome(): void {
   errorEl.hidden = !err;
 }
 
+let renderDeferred = false;
+onEditorsIdle(() => {
+  if (renderDeferred) renderBody();
+});
+
 function renderBody(): void {
+  // Never rebuild the table under an open editor; apply the latest state once it closes.
+  if (isEditing()) {
+    renderDeferred = true;
+    return;
+  }
+  renderDeferred = false;
   const view = activeView();
   if (!view || !columns) {
     tableEl.replaceChildren(h("p", { class: "empty-state" }, configError ? "" : "No views configured."));

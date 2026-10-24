@@ -64,4 +64,15 @@ body {
   .groom-box .cell-clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stale-dot { flex: none; width: 8px; height: 8px; margin-top: 0.4rem; border-radius: 50%; background: #f97316; }
   .link-btn { color: var(--accent); background: none; font-size: 12px; cursor: pointer; text-decoration: underline dotted; }
+
+  .th-inner { display: flex; align-items: center; }
+  .display-toggle { flex: none; padding: 0 0.4rem; color: var(--muted); cursor: pointer; background: none; font-size: 12px; }
+  .display-toggle:hover { color: var(--accent); }
+  .ticket-grid td.editable { cursor: text; }
+  .editor-wrap { display: flex; flex-direction: column; gap: 0.3rem; }
+  .editor-area, .editor-input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--accent); border-radius: 4px; padding: 0.2rem 0.4rem; font: inherit; }
+  .editor-area { resize: vertical; }
+  .editor-msg { color: #fecaca; background: #7f1d1d; border: 1px solid #b91c1c; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 12px; white-space: pre-wrap; }
+  .editor-msg[hidden], .editor-actions[hidden] { display: none; }
+  .editor-actions { display: flex; gap: 0.4rem; }
 }
