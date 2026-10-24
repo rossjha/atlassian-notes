@@ -1,1 +1,67 @@
 @import "tailwindcss";
+@source "../web";
+@source "../../public/index.html";
+
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --panel: #111c33;
+  --line: #243049;
+  --text: #e2e8f0;
+  --muted: #8b9ab3;
+  --accent: #60a5fa;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  margin: 0;
+}
+
+@layer components {
+  .app { padding: 0.75rem 1rem; }
+  .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--line); }
+  .tab { padding: 0.4rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; background: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .view-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; }
+  .jql { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #cbd5e1; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0.15rem 0.5rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn { padding: 0.2rem 0.7rem; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text); cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+  .error-bar { background: #7f1d1d; color: #fecaca; border: 1px solid #b91c1c; border-radius: 4px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; white-space: pre-wrap; }
+  .error-bar[hidden] { display: none; }
+  .text-muted { color: var(--muted); }
+  .empty-state { color: var(--muted); padding: 1rem; }
+
+  .table-wrap { overflow-x: auto; }
+  .grid { width: 100%; border-collapse: collapse; table-layout: auto; }
+  .grid th { text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--line); padding: 0; white-space: nowrap; }
+  .th-btn { padding: 0.35rem 0.5rem; width: 100%; text-align: left; text-transform: inherit; letter-spacing: inherit; font: inherit; color: inherit; cursor: pointer; background: none; }
+  .th-btn:hover, th.sorted .th-btn { color: var(--text); }
+  .grid td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .grid tbody tr:hover { background: rgba(148, 163, 184, 0.06); }
+  .col-summary { min-width: 18rem; }
+  .col-note, .col-groom { min-width: 16rem; max-width: 26rem; }
+  .num { font-variant-numeric: tabular-nums; }
+  .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .key:hover { text-decoration: underline; }
+
+  .pill { display: inline-block; padding: 0 0.5rem; border-radius: 999px; font-size: 11px; line-height: 1.5; background: #1e293b; color: #cbd5e1; border: 1px solid var(--line); white-space: nowrap; }
+  .pill-colored { color: var(--pill-color); border-color: var(--pill-color); background: color-mix(in srgb, var(--pill-color) 15%, transparent); }
+  .cat-done { color: #86efac; border-color: #166534; background: #052e16; }
+  .cat-indeterminate, .cat-in-progress { color: #93c5fd; border-color: #1e40af; background: #172554; }
+  .labels { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+
+  .cell-flex { display: flex; align-items: flex-start; gap: 0.4rem; }
+  .note-box { flex: 1; min-width: 0; border: 1px dashed #475569; border-radius: 4px; padding: 0.15rem 0.4rem; min-height: 1.6em; color: #cbd5e1; }
+  .note-box.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .note-box.expand, .expand { white-space: pre-wrap; }
+  .groom-box { flex: 1; min-width: 0; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(96, 165, 250, 0.35); border-radius: 4px; padding: 0.15rem 0.4rem; }
+  .groom-head { display: flex; gap: 0.5rem; align-items: center; font-size: 11px; }
+  .groom-readiness { color: #93c5fd; border-color: rgba(96, 165, 250, 0.5); background: transparent; }
+  .groom-box .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stale-dot { flex: none; width: 8px; height: 8px; margin-top: 0.4rem; border-radius: 50%; background: #f97316; }
+  .link-btn { color: var(--accent); background: none; font-size: 12px; cursor: pointer; text-decoration: underline dotted; }
+}
