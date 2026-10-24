@@ -372,3 +372,26 @@ The spec's "Done looks like" list, run in Firefox against the user's SCRUM proje
 - [ ] **Step 2:** Build the UI. Run `npm run build && npm test && npm run typecheck`. Expected: clean. Grep the new classes in `app.css`.
 - [ ] **Step 3:** Smoke run: the served `main.js` contains the search form, and `GET /api/board` includes `noteColumn`.
 - [ ] **Step 4:** Commit `feat: header ticket search, drawer star, note adds to Doing`.
+
+---
+
+### Task 7: "Note updated" and "Groomed" columns
+
+Requested by the user in chat (2026-10-24): local timestamps you can sort on, for table views.
+
+**Files:**
+- Modify: `src/shared/types.ts` (`BuiltinColumnId`, `BUILTIN_COLUMNS`), `src/shared/rowOps.ts` (`cellValue`), `src/web/cells.ts`, `test/rowOps.test.ts`, `README.md`, `src/server/configFiles.ts` only if column validation needs it
+
+**Interfaces:**
+- `BuiltinColumnId` gains `"noteUpdated"` and `"groomed"`. `BUILTIN_COLUMNS` gains `{ id: "noteUpdated", label: "Note updated" }` and `{ id: "groomed", label: "Groomed" }`. These are appended, so existing views are unchanged, and both are available in the view editor's column picker.
+- `cellValue(row, "noteUpdated")` returns `row.note?.mtimeMs ?? null`, a number.
+- `cellValue(row, "groomed")` returns `Date.parse(row.groom.groomedAt)`, or `null` when there's no groom or the date can't be parsed.
+- `sortRows` already sorts numbers numerically and puts nulls last.
+- Cells render `relativeTime` (from `src/web/dom.ts`) of the timestamp, with a `title` holding `new Date(ms).toLocaleString()`. They are empty when the value is null.
+
+- [ ] **Step 1:** Write the failing tests in `test/rowOps.test.ts`:
+  - `cellValue` for both new ids, with and without a note or groom
+  - `sortRows` by `noteUpdated` descending puts the newest first and the no-note rows last
+- [ ] **Step 2:** Run `npm test`. Expected: FAIL. Then implement, and run `npm run build && npm test && npm run typecheck`. Expected: clean.
+- [ ] **Step 3:** Add the two columns to the README's column list.
+- [ ] **Step 4:** Commit `feat: sortable Note updated and Groomed columns`.
