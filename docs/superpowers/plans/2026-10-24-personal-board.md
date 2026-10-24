@@ -328,3 +328,47 @@ Behaviour (calls 5, 6 and 8, plus the approved mockup):
 ## Acceptance (user, real browser and real Jira)
 
 The spec's "Done looks like" list, run in Firefox against the user's SCRUM project.
+
+---
+
+### Task 6: Header ticket search, drawer ★, note → noteColumn
+
+**Spec:** the "Addendum: ticket search" section.
+
+**Files:**
+- Modify: `src/server/board.ts`, `test/board.test.ts`, `examples/board.example.yaml`, `src/shared/types.ts`, `src/web/main.ts`, `src/web/drawer.ts`, `src/web/styles.css`, `README.md`
+
+**Interfaces:**
+- `BoardFile` gains `noteColumn: string`.
+  - `parseBoard` defaults it to `"Doing"` when that column exists, otherwise to the first column.
+  - It throws `ConfigFileError` when the value is set but isn't in `columns`.
+  - `serialiseBoard` writes it after `archiveColumn`.
+  - The example gains `noteColumn: Doing`.
+- `BoardResponse` gains `noteColumn: string`.
+- `openDrawer(key: string, opts?: { fromSearch?: boolean }): void`.
+- The drawer hooks gain:
+  - `star?: { isStarred(key): boolean; toggle(key): void; disabled: boolean }`
+  - `onNoteSavedFromSearch?(key: string, body: string): void`
+
+**Behaviour:**
+- **Header search:** a `<form>` holding a small `<input>` with the placeholder `Ticket key…`, in the tabs bar on the right.
+  - On submit, trim and upper-case the input.
+  - If `!isValidKeyClient(key)`, show the hint "Enter a key like ABC-123". `isValidKeyClient` mirrors the server regex `/^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/` and is exported from `src/shared/rowOps.ts`.
+  - Otherwise, call `openDrawer(key, {fromSearch: true})`.
+- **Drawer ★:** a button in the drawer header with the same look and states as the table ★. It is disabled while `board.yaml` is locked.
+- **Note implies Doing:**
+  - The trigger: the drawer was opened with `fromSearch`, the key is not on the board, and a note save succeeds with a non-empty body.
+  - `main.ts` then sends `{op: "move", key, column: board.noteColumn, index: Number.MAX_SAFE_INTEGER}` and updates `boardKeys`. The server clamps the index.
+  - Tickets already on the board are never moved by a note save.
+- **Tests:**
+  - `parseBoard` `noteColumn` defaulting:
+    - with Doing present → `"Doing"`
+    - with `columns: [A, B]` → `"A"`
+    - with `noteColumn: Nope` → `ConfigFileError`
+  - The round trip includes `noteColumn`.
+  - `isValidKeyClient` mirrors `isValidKey` on the same cases as `test/notesStore.test.ts`.
+
+- [ ] **Step 1:** Write the failing tests, run them, implement the server and shared parts, then run `npm test`. Expected: PASS.
+- [ ] **Step 2:** Build the UI. Run `npm run build && npm test && npm run typecheck`. Expected: clean. Grep the new classes in `app.css`.
+- [ ] **Step 3:** Smoke run: the served `main.js` contains the search form, and `GET /api/board` includes `noteColumn`.
+- [ ] **Step 4:** Commit `feat: header ticket search, drawer star, note adds to Doing`.

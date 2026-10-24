@@ -134,3 +134,15 @@ The user knows they won't deal with it straight away, and these tickets build up
 - Hand-edit `board.yaml` to add a column or move a key. The board updates live.
 - A starred ticket that is later deleted in Jira shows as "not found", and the rest of the board still loads.
 - A ticket that moves project keeps its place on the board under its new key.
+
+## Addendum: ticket search (added 2026-10-24, approved in chat)
+
+- **Search box in the page header.** A small input next to the tabs takes a ticket key (case-insensitive, normalised to upper case, validated with `isValidKey`). Enter opens that ticket in the existing side panel. An invalid format shows an inline hint and makes no request. A ticket Jira can't find shows "not found" in the panel.
+- **★ in the side panel.** The drawer header gets a ★ toggle for every ticket, wherever it was opened from.
+  - Starring from the panel adds the card to the **first column** (Backlog), like the table ★.
+  - Un-starring removes it.
+- **Note implies Doing, for search-opened tickets only (user's rule).** When a ticket opened from the header search is **not on the board**, saving a non-empty note in the panel stars it into the `noteColumn`.
+  - `board.yaml` gains an optional `noteColumn`. It defaults to `Doing` if that column exists, otherwise the first column, and it must be one of `columns`.
+  - Implemented as a `move` op of the key to `noteColumn` at the end.
+  - Tickets already on the board are never moved by writing a note.
+  - Claude's call: this applies only to tickets opened from search, so annotating tickets in table views doesn't flood the board.
