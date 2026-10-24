@@ -94,3 +94,11 @@ export interface IssueDetail {
   acceptanceCriteriaMd: string | null;
   comments: { author: string; created: string; bodyMd: string }[];
 }
+
+export interface Row {
+  ticket: Ticket;
+  note: { body: string; mtimeMs: number } | null;
+  groom: GroomSummary | null;
+  custom: Record<string, string>;
+  flags: { jiraNewerThanNote: boolean; jiraNewerThanGroom: boolean };
+}
