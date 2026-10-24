@@ -30,6 +30,24 @@ type Json = Record<string, any>;
 
 const BASE_FIELDS = ["summary", "status", "issuetype", "priority", "assignee", "reporter", "parent", "labels", "updated"];
 
+/** Jira's "+0100" offsets sort wrongly as strings and don't parse everywhere; send ISO UTC. Invalid → raw. */
+function toIso(v: unknown): string {
+  if (typeof v !== "string" || v === "") return "";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toISOString();
+}
+
+/** "fetch failed" alone is undiagnosable: add the underlying cause (ENOTFOUND, ECONNREFUSED, TLS errors…). */
+function describeNetworkError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const cause = e.cause as { code?: unknown; message?: unknown } | undefined;
+  if (!cause || typeof cause !== "object") return e.message;
+  const code = typeof cause.code === "string" ? cause.code : "";
+  const msg = typeof cause.message === "string" ? cause.message : "";
+  const detail = [code, msg].filter(Boolean).join(": ");
+  return detail ? `${e.message} (${detail})` : e.message;
+}
+
 export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): JiraClient {
   const auth = "Basic " + Buffer.from(`${opts.email}:${opts.token}`).toString("base64");
   const apiBase = opts.apiBase.replace(/\/+$/, "");
@@ -42,8 +60,7 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
     try {
       res = await fetchFn(url.toString(), { method: "GET", headers: { Authorization: auth, Accept: "application/json" } });
     } catch (e) {
-      const cause = e instanceof Error ? e.message : String(e);
-      throw new JiraError(0, [`Could not reach Jira: ${cause}`]);
+      throw new JiraError(0, [`Could not reach Jira: ${describeNetworkError(e)}`]);
     }
     const text = await res.text();
     if (!res.ok) {
@@ -53,6 +70,7 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
         messages = [
           ...(Array.isArray(body?.errorMessages) ? body.errorMessages.map(String) : []),
           ...Object.values(body?.errors ?? {}).map(String),
+          ...(typeof body?.message === "string" && body.message ? [body.message] : []),
         ];
       } catch {
         // not JSON
@@ -94,7 +112,7 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
       parent: f.parent ? { key: f.parent.key, summary: f.parent.fields?.summary ?? "" } : null,
       labels: Array.isArray(f.labels) ? f.labels : [],
       sprint: sprint?.name ?? null,
-      updated: f.updated ?? "",
+      updated: toIso(f.updated),
     };
   }
 
@@ -133,7 +151,7 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
         acceptanceCriteriaMd: ac && f[ac] != null ? adfToMarkdown(f[ac]) : null,
         comments: comments.map((c) => ({
           author: c.author?.displayName ?? "Unknown",
-          created: c.created ?? "",
+          created: toIso(c.created),
           bodyMd: adfToMarkdown(c.body),
         })),
       };

@@ -137,3 +137,43 @@ test("issue key is URL-encoded in the path", async () => {
   await client(fn).getIssueDetail("../x");
   assert.ok(calls[0].url.startsWith(`${SITE}/rest/api/3/issue/..%2Fx?`));
 });
+
+test("fetch rejection includes the cause code and message, never the token", async () => {
+  const fn = (async () => {
+    const cause = Object.assign(new Error("getaddrinfo ENOTFOUND acme.atlassian.net"), { code: "ENOTFOUND" });
+    throw new TypeError("fetch failed", { cause });
+  }) as typeof fetch;
+  await assert.rejects(client(fn).search("x", 10), (e: unknown) => {
+    assert.ok(e instanceof JiraError);
+    assert.match(e.message, /Could not reach Jira: fetch failed \(ENOTFOUND: getaddrinfo ENOTFOUND acme\.atlassian\.net\)/);
+    assert.ok(!e.message.includes("secret-token"));
+    assert.ok(!e.message.includes(Buffer.from("me@example.com:secret-token").toString("base64")));
+    return true;
+  });
+  const tls = (async () => {
+    throw new TypeError("fetch failed", { cause: Object.assign(new Error("unable to get local issuer certificate"), { code: "UNABLE_TO_GET_ISSUER_CERT_LOCALLY" }) });
+  }) as typeof fetch;
+  await assert.rejects(client(tls).search("x", 10), /unable to get local issuer certificate/);
+});
+
+test("error body `message` (scoped-token 401 from api.atlassian.com) is shown", async () => {
+  const { fn } = fakeFetch([{ status: 401, body: JSON.stringify({ code: 401, message: "Unauthorized; scope does not match" }) }]);
+  await assert.rejects(client(fn).search("x", 10), (e: unknown) => {
+    assert.ok(e instanceof JiraError);
+    assert.deepEqual(e.messages, ["Unauthorized; scope does not match"]);
+    return true;
+  });
+});
+
+test("ticket updated and comment created are normalised to ISO UTC; invalid stays raw", async () => {
+  const issue = JSON.parse(fixture("issue-detail.json"));
+  issue.fields.updated = "2026-10-20T09:30:00.000+0100";
+  issue.fields.comment.comments[0].created = "2026-10-19T10:00:00.000-0230";
+  const { fn } = fakeFetch([{ body: JSON.stringify(issue) }]);
+  const d = await client(fn).getIssueDetail("PAY-1");
+  assert.equal(d.ticket.updated, "2026-10-20T08:30:00.000Z");
+  assert.equal(d.comments[0].created, "2026-10-19T12:30:00.000Z");
+  issue.fields.updated = "not a date";
+  const bad = fakeFetch([{ body: JSON.stringify(issue) }]);
+  assert.equal((await client(bad.fn).getIssueDetail("PAY-1")).ticket.updated, "not a date");
+});
