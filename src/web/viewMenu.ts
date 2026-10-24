@@ -46,13 +46,13 @@ export function viewSettingsButton(viewName: string, actions: ViewMenuActions): 
     closeMenu();
     const item = (svg: SVGSVGElement, label: string, onclick: () => void, extra = "") =>
       h("button", { type: "button", role: "menuitem", class: `menu-item ${extra}`.trim(), onclick: () => { closeMenu(); onclick(); } }, svg, label);
-    const del = item(icon("trash", "menu-svg"), "Delete view…", actions.onDelete, "menu-danger");
+    const del = item(icon("trash", "menu-svg"), "Delete view", actions.onDelete, "menu-danger");
     if (actions.deleteDisabledReason) {
       del.setAttribute("disabled", "");
       del.setAttribute("title", actions.deleteDisabledReason);
     }
     const el = h("div", { class: "menu", role: "menu", "aria-label": `Options for view ${viewName}` },
-      item(icon("pencilSquare", "menu-svg"), "Edit view…", actions.onEdit),
+      item(icon("pencilSquare", "menu-svg"), "Edit view", actions.onEdit),
       del,
     );
     document.body.append(el);
