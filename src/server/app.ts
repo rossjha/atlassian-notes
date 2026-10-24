@@ -177,7 +177,9 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       return send(res, 200, await rowsFor(view, await loadColumns(config.notesDir)));
     }
     if (a === "orphans" && segs.length === 1 && method === "GET") {
-      return send(res, 200, { orphans: refresher.orphans() });
+      return send(res, 200, {
+        orphans: refresher.orphans().map((key) => ({ key, notePath: notes.notePath(key), groomPath: notes.groomPath(key) })),
+      });
     }
     if (a === "tickets" && b && segs.length === 2 && method === "GET") {
       requireKey(b);

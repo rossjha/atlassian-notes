@@ -36,6 +36,7 @@ let dir: string;
 let server: http.Server;
 let port: number;
 let stopWatch: () => void;
+let refresherRef: Refresher;
 const base = () => `http://localhost:${port}`;
 const J = { "Content-Type": "application/json" };
 const put = (p: string, body: unknown, headers: Record<string, string> = J) =>
@@ -58,6 +59,7 @@ before(async () => {
     onChange: (e) => broadcast(e),
     statePath: path.join(dir, ".cache", "reconcile.json"),
   });
+  refresherRef = refresher;
   const app = createApp({ config, jira, notes, cache, refresher, publicDir });
   broadcast = app.broadcast;
   server = app.server;
@@ -200,6 +202,17 @@ test("ticket detail renders markdown safely; copy kinds; orphans", async () => {
   assert.equal((await fetch(base() + "/api/tickets/PAY-1/copy/notes")).status, 200);
   assert.equal((await fetch(base() + "/api/tickets/PAY-1/copy/bogus")).status, 400);
   assert.deepEqual(await (await fetch(base() + "/api/orphans")).json(), { orphans: [] });
+  const orig = refresherRef.orphans;
+  refresherRef.orphans = () => ["GONE-1"];
+  try {
+    const { orphans } = await (await fetch(base() + "/api/orphans")).json();
+    assert.equal(orphans.length, 1);
+    assert.equal(orphans[0].key, "GONE-1");
+    assert.ok(orphans[0].notePath.endsWith(path.join("jira", "notes", "GONE-1.md")));
+    assert.ok(orphans[0].groomPath.endsWith(path.join("jira", "groom", "GONE-1.md")));
+  } finally {
+    refresherRef.orphans = orig;
+  }
 });
 
 test("jira failure on ticket detail is 502; unexpected error is 500 without details", async () => {

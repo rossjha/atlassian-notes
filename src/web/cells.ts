@@ -1,7 +1,7 @@
 import type { ColumnSetting, ColumnsConfig, Row } from "../shared/types.ts";
 import { cellValue } from "../shared/rowOps.ts";
 import { api } from "./api.ts";
-import { h, relativeTime } from "./dom.ts";
+import { copyToClipboard, h, relativeTime } from "./dom.ts";
 
 function dot(title: string): HTMLElement {
   return h("span", { class: "stale-dot", title });
@@ -11,12 +11,7 @@ function copyPromptLink(key: string): HTMLElement {
   const link = h("button", { type: "button", class: "link-btn" }, "copy groom prompt");
   link.addEventListener("click", async (e) => {
     e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(await api.copyPrompt(key));
-      link.textContent = "Copied";
-    } catch {
-      link.textContent = "Copy failed";
-    }
+    link.textContent = (await copyToClipboard(() => api.copyPrompt(key))) ? "Copied" : "Copy failed";
     setTimeout(() => (link.textContent = "copy groom prompt"), 1500);
   });
   return link;

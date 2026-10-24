@@ -1,4 +1,4 @@
-import type { ColumnsConfig, NoteFile, Row, View } from "../shared/types.ts";
+import type { ColumnsConfig, GroomFile, IssueDetail, NoteFile, Row, View } from "../shared/types.ts";
 
 export interface ConfigResponse {
   views: View[];
@@ -11,6 +11,24 @@ export interface RowsResponse {
   rows: Row[];
   fetchedAt: string | null;
   error: string | null;
+}
+
+export type CopyKind = "ticket" | "notes" | "both" | "prompt";
+
+export interface TicketResponse {
+  detail: IssueDetail;
+  html: { description: string; acceptanceCriteria: string; comments: string[] };
+  note: NoteFile | null;
+  noteHtml: string;
+  groom: GroomFile | null;
+  groomHtml: string;
+  groomPath: string;
+}
+
+export interface Orphan {
+  key: string;
+  notePath: string;
+  groomPath: string;
 }
 
 async function request(method: string, url: string): Promise<Response> {
@@ -78,7 +96,16 @@ export const api = {
   async refresh(viewId: string): Promise<RowsResponse> {
     return (await request("POST", `/api/views/${encodeURIComponent(viewId)}/refresh`)).json() as Promise<RowsResponse>;
   },
-  async copyPrompt(key: string): Promise<string> {
-    return (await request("GET", `/api/tickets/${encodeURIComponent(key)}/copy/prompt`)).text();
+  async copy(key: string, kind: CopyKind): Promise<string> {
+    return (await request("GET", `/api/tickets/${encodeURIComponent(key)}/copy/${kind}`)).text();
+  },
+  copyPrompt(key: string): Promise<string> {
+    return api.copy(key, "prompt");
+  },
+  async ticket(key: string): Promise<TicketResponse> {
+    return (await request("GET", `/api/tickets/${encodeURIComponent(key)}`)).json() as Promise<TicketResponse>;
+  },
+  async orphans(): Promise<Orphan[]> {
+    return ((await (await request("GET", "/api/orphans")).json()) as { orphans: Orphan[] }).orphans;
   },
 };

@@ -41,3 +41,13 @@ export function relativeTime(iso: string | null, now: number = Date.now()): stri
   if (mo < 12) return `${mo}mo ago`;
   return `${Math.floor(d / 365)}y ago`;
 }
+
+/** Fetches text and writes it to the clipboard; resolves false on any failure. */
+export async function copyToClipboard(getText: () => Promise<string>): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(await getText());
+    return true;
+  } catch {
+    return false;
+  }
+}

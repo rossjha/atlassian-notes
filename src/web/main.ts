@@ -1,7 +1,8 @@
 import type { ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
-import { api } from "./api.ts";
+import { api, type Orphan } from "./api.ts";
 import { h, relativeTime } from "./dom.ts";
+import { configureDrawer, drawerOnLive, openDrawer } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
 import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
@@ -28,14 +29,20 @@ const tabsEl = h("nav", { class: "tabs" });
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
 const filterEl = h("div", { class: "filter-bar" });
+const orphansEl = h("div", { class: "orphans-panel" });
+orphansEl.hidden = true;
 const tableEl = h("div", { class: "table-wrap" });
-root.append(h("main", { class: "app" }, tabsEl, headerEl, errorEl, filterEl, tableEl));
+root.append(h("main", { class: "app" }, tabsEl, headerEl, orphansEl, errorEl, filterEl, tableEl));
+configureDrawer({
+  getRow: (key) => rows.find((r) => r.ticket.key === key),
+  onNoteSaved: () => void loadRows(),
+});
+let orphans: Orphan[] = [];
+let orphansOpen = false;
 
 const handlers: TableHandlers = {
   onOpen(key) {
-    // Placeholder until the drawer (Task 12): open the Jira page.
-    const url = rows.find((r) => r.ticket.key === key)?.ticket.url;
-    if (url) window.open(url, "_blank", "noopener");
+    openDrawer(key);
   },
   onSort(columnId) {
     sort = sort?.columnId === columnId
@@ -184,6 +191,22 @@ function renderChrome(): void {
       refresh,
     );
   }
+  if (orphans.length > 0) {
+    headerEl.append(h("button", {
+      type: "button",
+      class: "link-btn orphan-link",
+      "aria-expanded": String(orphansOpen),
+      onclick: () => {
+        orphansOpen = !orphansOpen;
+        renderChrome();
+      },
+    }, `${orphans.length} orphaned ${orphans.length === 1 ? "note" : "notes"}`));
+  }
+  orphansEl.hidden = !(orphansOpen && orphans.length > 0);
+  orphansEl.replaceChildren(
+    h("div", { class: "text-muted" }, "Notes whose ticket is no longer found in Jira. The files are left untouched."),
+    ...orphans.map((o) => h("div", { class: "orphan-row" }, h("code", { class: "key" }, o.key), h("code", { class: "text-muted" }, o.notePath), h("code", { class: "text-muted" }, o.groomPath))),
+  );
   const err = [configError ?? rowsError, saveError].filter(Boolean).join("\n");
   errorEl.textContent = err ?? "";
   errorEl.hidden = !err;
@@ -247,6 +270,16 @@ async function loadRows(): Promise<void> {
   }
 }
 
+async function loadOrphans(): Promise<void> {
+  try {
+    orphans = await api.orphans();
+  } catch {
+    orphans = [];
+  }
+  if (orphans.length === 0) orphansOpen = false;
+  renderChrome();
+}
+
 function applyRows(r: Row[], at: string | null, err: string | null): void {
   rows = r;
   rowsLoaded = true;
@@ -283,12 +316,14 @@ function onLive(e: LiveEvent): void {
     case "note":
     case "groom":
       void loadRows();
+      drawerOnLive(e.key);
       break;
     case "views":
     case "columns":
       void loadConfig();
       break;
     case "orphans":
+      void loadOrphans();
       break;
   }
 }
@@ -299,3 +334,4 @@ setInterval(() => {
 }, 30_000); // keep "last refreshed" fresh
 connectLive(onLive);
 void loadConfig();
+void loadOrphans();
