@@ -31,7 +31,8 @@ const errMessage = (e: unknown): string => (e instanceof Error ? e.message : Str
 
 export class BoardService {
   private deps: BoardServiceDeps;
-  private chain: Promise<void> = Promise.resolve();
+  private running: Promise<void> | null = null;
+  private pending: Promise<void> | null = null;
 
   constructor(deps: BoardServiceDeps) {
     this.deps = deps;
@@ -65,10 +66,23 @@ export class BoardService {
   }
 
   refresh(): Promise<void> {
-    const run = () => this.doRefresh();
-    const p = this.chain.then(run, run);
-    this.chain = p.catch(() => {});
-    return p;
+    if (!this.running) {
+      const p = this.doRefresh().finally(() => {
+        if (this.running === p) this.running = null;
+      });
+      this.running = p;
+      return p;
+    }
+    if (!this.pending) {
+      const follow = this.running
+        .catch(() => {})
+        .then(() => {
+          this.pending = null;
+          return this.refresh();
+        });
+      this.pending = follow;
+    }
+    return this.pending;
   }
 
   private async doRefresh(): Promise<void> {
@@ -76,7 +90,8 @@ export class BoardService {
     let keys: string[];
     try {
       keys = boardKeys(await loadBoard(notesDir));
-    } catch {
+    } catch (e) {
+      if (!(e instanceof ConfigFileError)) console.error("board refresh: cannot read board.yaml:", errMessage(e));
       return;
     }
     const prev = await cache.read(BOARD_CACHE_ID);
@@ -88,9 +103,11 @@ export class BoardService {
 
     for (let i = 0; i < keys.length; i += CHUNK) {
       const chunk = keys.slice(i, i + CHUNK);
+      const searchKeys = chunk.filter((k) => !this.recentlyNotFound(state, k));
+      if (searchKeys.length === 0) continue;
       let returned: Ticket[] = [];
       try {
-        returned = await jira.search(`key in (${chunk.join(",")})`, chunk.length);
+        returned = await jira.search(`key in (${searchKeys.join(",")})`, searchKeys.length);
       } catch (e) {
         if (!(e instanceof JiraError && e.status === 400)) {
           errors.push(e instanceof JiraError ? e.messages.join("; ") || e.message : errMessage(e));
@@ -102,29 +119,38 @@ export class BoardService {
         }
       }
       for (const tk of returned) result.set(tk.key, tk);
-      for (const key of chunk) {
+      for (const key of searchKeys) {
         if (result.has(key)) {
           delete state.notFound[key];
           continue;
         }
-        if (this.recentlyNotFound(state, key)) continue;
+        let found: Ticket;
         try {
-          const found = (await jira.getIssueDetail(key)).ticket;
-          if (found.key !== key) {
-            await updateBoard(notesDir, (b) => renameInBoard(b, key, found.key));
-            if ((await notes.readNote(key)) || (await notes.readGroom(key))) {
-              await notes.renameKey(key, found.key);
-              onChange({ type: "note", key: found.key });
-              onChange({ type: "groom", key: found.key });
-            }
-            onChange({ type: "board" });
-          }
-          result.set(found.key, found);
-          delete state.notFound[key];
+          found = (await jira.getIssueDetail(key)).ticket;
         } catch (e) {
           if (e instanceof JiraError && e.status === 404) state.notFound[key] = nowIso;
-          // any other error: skip this key this round
+          else console.error(`board lookup of ${key} failed:`, errMessage(e));
+          continue;
         }
+        delete state.notFound[key];
+        if (found.key !== key) {
+          try {
+            await updateBoard(notesDir, (b) => renameInBoard(b, key, found.key));
+            if ((await notes.readNote(key)) || (await notes.readGroom(key))) {
+              const res = await notes.renameKey(key, found.key);
+              if (res === "renamed") {
+                onChange({ type: "note", key: found.key });
+                onChange({ type: "groom", key: found.key });
+              } else {
+                console.error(`board rename ${key} -> ${found.key}: ${res}; note stays under ${key}`);
+              }
+            }
+            onChange({ type: "board" });
+          } catch (e) {
+            console.error(`board rename ${key} -> ${found.key} failed:`, errMessage(e));
+          }
+        }
+        result.set(found.key, found);
       }
     }
 

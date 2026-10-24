@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,11 +14,15 @@ const t = (key: string, id = key) => ({ id, key, summary: `s ${key}`, updated: "
 const backlog = (dir: string) => parseBoard(fs.readFileSync(path.join(dir, "board.yaml"), "utf8"), "board.yaml").cards.Backlog;
 const detail = (ticket: Ticket) => ({ ticket, descriptionMd: "", acceptanceCriteriaMd: null, comments: [] }) as IssueDetail;
 
+const dirs: string[] = [];
+after(() => { for (const d of dirs) fs.rmSync(d, { recursive: true, force: true }); });
+
 function setup(
   keys: string[],
   jiraImpl: { search?: JiraClient["search"]; getIssueDetail?: JiraClient["getIssueDetail"] } = {},
 ) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "board-"));
+  dirs.push(dir);
   if (keys.length) {
     fs.writeFileSync(
       path.join(dir, "board.yaml"),
@@ -60,8 +64,11 @@ test("refresh caches all returned starred tickets and emits board", async () => 
 });
 
 test("deleted key is shown missing, others load, and not-found is remembered for 24h", async () => {
-  const { svc, details } = setup(["A-1", "GONE-1", "A-2"], {
-    search: async () => { throw new JiraError(400, ["does not exist"]); },
+  const { svc, details, searches } = setup(["A-1", "GONE-1", "A-2"], {
+    search: async (jql) => {
+      if (jql.includes("GONE-1")) throw new JiraError(400, ["does not exist"]);
+      return jql.slice(jql.indexOf("(") + 1, -1).split(",").map((k) => t(k));
+    },
     getIssueDetail: async (k) => {
       if (k === "GONE-1") throw new JiraError(404, ["nope"]);
       return detail(t(k));
@@ -77,8 +84,12 @@ test("deleted key is shown missing, others load, and not-found is remembered for
   assert.ok(cards[2].row);
   assert.equal(v.error, null);
   assert.equal(v.locked, false);
+  const searchesBefore = searches.length;
+  const detailsBefore = details.length;
   await svc.refresh();
+  assert.equal(details.length, detailsBefore);
   assert.equal(details.filter((k) => k === "GONE-1").length, 1);
+  assert.ok(!searches.slice(searchesBefore).some((q) => q.includes("GONE-1")));
 });
 
 test("rename without a note file updates board.yaml in place and creates no note", async () => {
@@ -131,6 +142,7 @@ test("apply add of an unknown key starts a refresh", async () => {
   for (let i = 0; i < 50 && searches.length === 0; i++) await new Promise((r) => setTimeout(r, 10));
   assert.equal(searches.length, 1);
   assert.match(searches[0], /X-1/);
+  await svc.refresh();
 });
 
 test("apply add of a key already in a view cache does not refresh", async () => {
@@ -176,4 +188,57 @@ test("rename() renames in the board and emits board only if changed", async () =
   assert.equal(events.filter((e) => e.type === "board").length, 1);
   await svc.rename("OLD-1", "NEW-2");
   assert.equal(events.filter((e) => e.type === "board").length, 1);
+});
+
+test("rename with target-exists keeps the note under the old key and logs", async () => {
+  const { svc, dir, notes, events } = setup(["OLD-1"], {
+    search: async () => [],
+    getIssueDetail: async () => detail(t("NEW-1")),
+  });
+  await notes.writeNoteBody("OLD-1", "a", { baseMtimeMs: null });
+  await notes.writeNoteBody("NEW-1", "b", { baseMtimeMs: null });
+  const orig = console.error;
+  const logged: unknown[][] = [];
+  console.error = (...a: unknown[]) => { logged.push(a); };
+  try { await svc.refresh(); } finally { console.error = orig; }
+  assert.ok(fs.existsSync(path.join(dir, "jira", "notes", "OLD-1.md")));
+  assert.equal(logged.length, 1);
+  assert.ok(!events.some((e) => e.type === "note"));
+});
+
+test("per-chunk P1: a failing chunk keeps prior tickets, a good chunk is fresh", async () => {
+  const keys = Array.from({ length: 60 }, (_, i) => `K-${i + 1}`);
+  let phase = 1;
+  const { svc, cache } = setup(keys, {
+    search: async (jql) => {
+      const ks = jql.slice(jql.indexOf("(") + 1, -1).split(",");
+      if (phase === 2 && ks[0] === "K-51") throw new JiraError(500, ["boom"]);
+      return ks.map((k) => ({ ...t(k), summary: `p${phase}` }));
+    },
+  });
+  await svc.refresh();
+  phase = 2;
+  await svc.refresh();
+  const c = await cache.read(BOARD_CACHE_ID);
+  assert.equal(c.tickets.length, 60);
+  assert.equal(c.error, "boom");
+  const by = new Map(c.tickets.map((x) => [x.key, x]));
+  assert.equal(by.get("K-1")!.summary, "p2");
+  assert.equal(by.get("K-55")!.summary, "p1");
+});
+
+test("overlapping refreshes coalesce into one follow-up run", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const { svc, searches } = setup(["A-1"], {
+    search: async () => { if (searches.length === 1) await gate; return [t("A-1")]; },
+  });
+  const p1 = svc.refresh();
+  await new Promise((r) => setTimeout(r, 20));
+  const p2 = svc.refresh();
+  const p3 = svc.refresh();
+  assert.equal(p2, p3);
+  release();
+  await Promise.all([p1, p2, p3]);
+  assert.equal(searches.length, 2);
 });
