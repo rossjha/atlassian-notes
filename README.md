@@ -9,7 +9,7 @@ Requires Node 22.18 or newer.
 ```sh
 npm install
 npm run setup   # asks for site, email, token, default project; checks the connection
-npm start       # builds the CSS/JS, starts on http://127.0.0.1:4317 and opens your browser
+npm start       # builds the CSS/JS, starts on http://localhost:4317 and opens your browser
 ```
 
 Your Jira settings are saved to `~/.config/atlassian-notes/.env` (mode 600), outside this folder. Set `ATLASSIAN_NOTES_ENV` to use a different file. The app never reads a `.env` in the app folder. `.env.example` lists every key (`NOTES_DIR`, `REFRESH_MINUTES`, `PORT`, `OPEN_BROWSER` are optional).
@@ -20,6 +20,8 @@ Create one at <https://id.atlassian.com/manage-profile/security/api-tokens>.
 
 - Recommended: a scoped token ("Create API token with scopes") with only `read:jira-work` and `read:jira-user`. Scoped tokens can't go through your `*.atlassian.net` address, so requests go via `api.atlassian.com`. `npm run setup` handles this: answer "y" to "scoped token" and it looks up your site's cloud id and stores it as `JIRA_CLOUD_ID`. Scoped tokens expire (at most one year), so re-run `npm run setup` when it stops working.
 - A classic token also works. The app only ever makes GET requests either way.
+
+Behind a corporate proxy that inspects TLS, Jira errors may say "unable to get local issuer certificate": point Node at your company's root certificate with `NODE_EXTRA_CA_CERTS=/path/to/corp-root.pem npm start`.
 
 ## Where your data lives
 
@@ -52,6 +54,11 @@ custom:
     options:
       Tech debt: "#e5b45b"
 ```
+
+Optional keys:
+
+- `jiraFields.acceptanceCriteria`: the `customfield_NNNNN` holding acceptance criteria, if your site has one. It is shown in the ticket drawer and included in "Copy ticket".
+- `groomPrompt`: the text the "Copy groom prompt" button copies. Placeholders `{key}`, `{url}` and `{groomPath}` are filled in per ticket. The default asks for a skill called `groom-work-item` (the author's own); change it to name your own grooming skill or prompt.
 
 Finding your field ids: open `https://<your-site>/rest/api/3/field` in a browser while logged in to Jira and search for "Story point estimate" and "Sprint". The `id` is the `customfield_NNNNN` value. Custom column values are stored in each note's front matter. Option lists are only edited in this file, but you filter on them from the UI.
 

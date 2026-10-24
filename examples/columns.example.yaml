@@ -13,3 +13,6 @@ custom:
   ownerGuess:
     label: Owner guess
     type: text
+# Text for "Copy groom prompt"; {key}, {url} and {groomPath} are filled in per ticket.
+# The default names the author's own groom-work-item skill: change it to yours.
+# groomPrompt: "Run my-groom-skill on {key} ({url}). Save the result to {groomPath} with front matter: readiness, summary, groomed_at (ISO)."
