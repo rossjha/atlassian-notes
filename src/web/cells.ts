@@ -33,8 +33,12 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
   switch (setting.id) {
     case "key":
       return h("a", { href: t.url, class: "key", "data-open": t.key }, t.key);
-    case "summary":
-      return plain(t.summary);
+    case "summary": {
+      // One line, ellipsised at ~45 characters (or at the column's width once sized); the full text is the tooltip.
+      const el = plain(t.summary, "cell-summary");
+      el.title = t.summary;
+      return el;
+    }
     case "status":
       return h("span", { class: `pill cat-${t.statusCategory.replace(/\W+/g, "-").toLowerCase()}` }, t.status);
     case "parent":
