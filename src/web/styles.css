@@ -28,6 +28,13 @@ body {
   .ticket-search-icon { position: absolute; left: 0.45rem; width: 14px; height: 14px; color: var(--muted); pointer-events: none; }
   .ticket-search-input { width: 10rem; padding: 0.2rem 0.5rem 0.2rem 1.6rem; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text); }
   .ticket-search-input:focus { outline: none; border-color: var(--accent); }
+  .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border-radius: 6px; color: var(--muted); cursor: pointer; }
+  .icon-btn:hover:not([disabled]) { color: var(--text); background: var(--panel); }
+  .icon-btn[disabled] { cursor: default; opacity: 0.6; }
+  .icon-btn-svg { width: 16px; height: 16px; }
+  .icon-spin { animation: icon-spin 0.9s linear infinite; }
+  @keyframes icon-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .icon-spin { animation: none; } }
   .tabs-divider { align-self: center; color: var(--line); padding: 0 0.25rem; user-select: none; }
   .ticket-search-hint { font-size: 11px; color: #fca5a5; white-space: nowrap; }
   .star-btn.dr-star { flex: none; font-size: 18px; }

@@ -1,5 +1,5 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
-import { icon } from "./icons.ts";
+import { icon, refreshButton } from "./icons.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
@@ -327,8 +327,7 @@ function renderChrome(): void {
   headerEl.replaceChildren();
   if (view) {
     const busy = refreshingIds.has(view.id);
-    const refresh = h("button", { type: "button", class: "btn", onclick: () => void doRefresh() }, busy ? "Refreshing…" : "Refresh");
-    if (busy) refresh.setAttribute("disabled", "");
+    const refresh = refreshButton(busy, false, () => void doRefresh());
     if (jqlEditor && (locked || jqlEditor.viewId !== view.id)) jqlEditor = null;
     const jql = jqlEditor
       ? jqlEditor.el
@@ -502,8 +501,7 @@ function renderBody(): void {
     filterEl.hidden = true;
     if (boardData) renderBoard(tableEl, boardData, { ...boardHandlers, refreshing: boardRefreshing });
     else {
-      const refresh = h("button", { type: "button", class: "btn", onclick: () => void refreshBoard() }, boardRefreshing ? "Refreshing…" : "Refresh");
-      if (boardRefreshing) refresh.setAttribute("disabled", "");
+      const refresh = refreshButton(boardRefreshing, false, () => void refreshBoard());
       tableEl.replaceChildren(
         h("div", { class: "view-header board-header" }, h("span", { class: "text-muted last-refreshed" }, "Last refreshed never"), refresh),
         h("p", { class: "empty-state" }, boardError ? "" : "Loading board…"),

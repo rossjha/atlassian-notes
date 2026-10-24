@@ -1,6 +1,7 @@
 import { locate } from "../shared/boardOps.ts";
 import type { BoardCard, BoardOp, BoardResponse, Row } from "../shared/types.ts";
 import { h, relativeTime } from "./dom.ts";
+import { refreshButton } from "./icons.ts";
 import { editNote, isEditing } from "./editors.ts";
 
 export interface BoardHandlers {
@@ -296,8 +297,7 @@ export function renderBoard(container: HTMLElement, data: BoardResponse, handler
   const spot = focusSpot(container);
   archiveBtn = null;
 
-  const refresh = h("button", { type: "button", class: "btn", onclick: () => handlers.onRefresh() }, handlers.refreshing ? "Refreshing…" : "Refresh");
-  if (handlers.refreshing || disabled) refresh.setAttribute("disabled", "");
+  const refresh = refreshButton(handlers.refreshing, disabled, () => handlers.onRefresh());
   const header = h("div", { class: "view-header board-header" },
     h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(data.fetchedAt)}`),
     refresh,
