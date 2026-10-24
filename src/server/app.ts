@@ -38,6 +38,7 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
   ".map": "application/json; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".woff2": "font/woff2",
 };
 const FALLBACK_COLUMNS: ColumnsConfig = {
   jiraFields: { storyPoints: null, sprint: "customfield_10020", acceptanceCriteria: null },

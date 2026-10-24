@@ -1,0 +1,282 @@
+/* Copied from forge packages/theme/src/themes.css @ 0bee37f — re-copy to update.
+   (Only the ten theme blocks; forge's trailing motion tokens are not used here.) */
+:root,
+[data-theme="carbon"] {
+  color-scheme: dark;
+  --bg: #050505;
+  --surface: #0a0a0a;
+  --surface-2: #141414;
+  --fg: #e5e5e5;
+  --muted: #8a8a8a;
+  --dim: #666666;
+  --border: #1c1c1c;
+  --accent: #f5c518;
+  --accent-fg: #050505;
+  --success: #4ade80;
+  --warn: #f5c518;
+  --danger: #f87171;
+  --chart-1: #f5c518;
+  --chart-2: #22d3ee;
+  --chart-3: #a78bfa;
+  --chart-4: #fb923c;
+  --chart-5: #e5e5e5;
+  --r-sm: 0px;
+  --r-md: 0px;
+  --r-lg: 0px;
+  --label-tracking: 0.18em;
+  --page-pattern: radial-gradient(#1f1f1f 1px, transparent 0);
+  --nav-bg: rgb(5 5 5 / 0.9);
+  --nav-blur: blur(4px);
+}
+
+[data-theme="tokyo-night"] {
+  color-scheme: dark;
+  --bg: #1a1b26;
+  --surface: #1f2335;
+  --surface-2: #292e42;
+  --fg: #c0caf5;
+  --muted: #8c94be;
+  --dim: #8c94be;
+  --border: #3b4261;
+  --accent: #7aa2f7;
+  --accent-fg: #1a1b26;
+  --success: #9ece6a;
+  --warn: #e0af68;
+  --danger: #f7768e;
+  --chart-1: #7aa2f7;
+  --chart-2: #7dcfff;
+  --chart-3: #bb9af7;
+  --chart-4: #ff9e64;
+  --chart-5: #c0caf5;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="catppuccin-mocha"] {
+  color-scheme: dark;
+  --bg: #1e1e2e;
+  --surface: #181825;
+  --surface-2: #313244;
+  --fg: #cdd6f4;
+  --muted: #a6adc8;
+  --dim: #a6adc8;
+  --border: #45475a;
+  --accent: #cba6f7;
+  --accent-fg: #1e1e2e;
+  --success: #a6e3a1;
+  --warn: #f9e2af;
+  --danger: #f38ba8;
+  --chart-1: #cba6f7;
+  --chart-2: #74c7ec;
+  --chart-3: #fab387;
+  --chart-4: #f5c2e7;
+  --chart-5: #cdd6f4;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="catppuccin-latte"] {
+  color-scheme: light;
+  --bg: #eff1f5;
+  --surface: #e6e9ef;
+  --surface-2: #ccd0da;
+  --fg: #4c4f69;
+  --muted: #56586a;
+  --dim: #56586a;
+  --border: #bcc0cc;
+  --accent: #7113ec;
+  --accent-fg: #eff1f5;
+  --success: #29661b;
+  --warn: #983c07;
+  --danger: #b30d31;
+  --chart-1: #7113ec;
+  --chart-2: #1e66f5;
+  --chart-3: #c2410c;
+  --chart-4: #b4237f;
+  --chart-5: #4c4f69;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="gruvbox"] {
+  color-scheme: dark;
+  --bg: #282828;
+  --surface: #32302f;
+  --surface-2: #3c3836;
+  --fg: #ebdbb2;
+  --muted: #afa18d;
+  --dim: #afa18d;
+  --border: #504945;
+  --accent: #fe8019;
+  --accent-fg: #282828;
+  --success: #b8bb26;
+  --warn: #fabd2f;
+  --danger: #fc7b6c;
+  --chart-1: #fe8019;
+  --chart-2: #83a598;
+  --chart-3: #d3869b;
+  --chart-4: #8ec07c;
+  --chart-5: #ebdbb2;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="nord"] {
+  color-scheme: dark;
+  --bg: #2e3440;
+  --surface: #3b4252;
+  --surface-2: #434c5e;
+  --fg: #eceff4;
+  --muted: #b4bdcb;
+  --dim: #b4bdcb;
+  --border: #4c566a;
+  --accent: #8fc4d3;
+  --accent-fg: #2e3440;
+  --success: #abc395;
+  --warn: #ebcb8b;
+  --danger: #dfb0b4;
+  --chart-1: #88c0d0;
+  --chart-2: #81a1c1;
+  --chart-3: #b48ead;
+  --chart-4: #d08770;
+  --chart-5: #eceff4;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="everforest"] {
+  color-scheme: dark;
+  --bg: #2d353b;
+  --surface: #343f44;
+  --surface-2: #3d484d;
+  --fg: #d3c6aa;
+  --muted: #aeb8b1;
+  --dim: #aeb8b1;
+  --border: #475258;
+  --accent: #a7c080;
+  --accent-fg: #2d353b;
+  --success: #a7c080;
+  --warn: #dbbc7f;
+  --danger: #eda0a1;
+  --chart-1: #a7c080;
+  --chart-2: #7fbbb3;
+  --chart-3: #d699b6;
+  --chart-4: #e69875;
+  --chart-5: #d3c6aa;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="kanagawa"] {
+  color-scheme: dark;
+  --bg: #1f1f28;
+  --surface: #2a2a37;
+  --surface-2: #363646;
+  --fg: #dcd7ba;
+  --muted: #a2a195;
+  --dim: #a2a195;
+  --border: #54546d;
+  --accent: #86a2da;
+  --accent-fg: #1f1f28;
+  --success: #98bb6c;
+  --warn: #e6c384;
+  --danger: #ff7478;
+  --chart-1: #86a2da;
+  --chart-2: #957fb8;
+  --chart-3: #ffa066;
+  --chart-4: #7aa89f;
+  --chart-5: #dcd7ba;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="rose-pine"] {
+  color-scheme: dark;
+  --bg: #191724;
+  --surface: #1f1d2e;
+  --surface-2: #28253d;
+  --fg: #e0def4;
+  --muted: #908caa;
+  --dim: #908caa;
+  --border: #403d52;
+  --accent: #c4a7e7;
+  --accent-fg: #191724;
+  --success: #9ccfd8;
+  --warn: #f6c177;
+  --danger: #eb6f92;
+  --chart-1: #c4a7e7;
+  --chart-2: #ebbcba;
+  --chart-3: #9ccfd8;
+  --chart-4: #f6c177;
+  --chart-5: #e0def4;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
+
+[data-theme="matte-black"] {
+  color-scheme: dark;
+  --bg: #121212;
+  --surface: #1a1a1a;
+  --surface-2: #232323;
+  --fg: #bebebe;
+  --muted: #8a8a8a;
+  --dim: #8a8a8a;
+  --border: #333333;
+  --accent: #e8a838;
+  --accent-fg: #121212;
+  --success: #8bc34a;
+  --warn: #f59e0b;
+  --danger: #e57373;
+  --chart-1: #e8a838;
+  --chart-2: #64b5f6;
+  --chart-3: #ba68c8;
+  --chart-4: #4dd0e1;
+  --chart-5: #bebebe;
+  --r-sm: 2px;
+  --r-md: 3px;
+  --r-lg: 4px;
+  --label-tracking: 0.08em;
+  --page-pattern: radial-gradient(color-mix(in oklab, var(--border) 60%, transparent) 1px, transparent 0);
+  --nav-bg: var(--bg);
+  --nav-blur: none;
+}
