@@ -1,5 +1,6 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { icon, refreshButton } from "./icons.ts";
+import { confirmDialog, viewMenuButton } from "./viewMenu.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
@@ -222,13 +223,30 @@ async function deleteView(id: string): Promise<void> {
   }
 }
 
+async function confirmDeleteView(view: View): Promise<void> {
+  if (viewsLocked() || views.length <= 1) return;
+  const ok = await confirmDialog({
+    title: `Delete view "${view.name}"?`,
+    body: "This removes the tab and its saved JQL, columns and filters from views.yaml. Your notes, Claude's groom files and your Kanban board are not affected.",
+    confirmLabel: "Delete view",
+  });
+  if (!ok) return;
+  try {
+    await deleteView(view.id);
+    saveError = null;
+  } catch (e) {
+    saveError = (e as Error).message;
+  }
+  renderChrome();
+}
+
 function editView(view: View | null): void {
   if (!columns || viewsLocked()) return;
   openViewEditor(
     view,
     columns,
     (v) => saveEditedView(v, view === null),
-    view && views.length > 1 ? () => deleteView(view.id) : undefined,
+    undefined, // deleting lives in the tab's ⋯ menu, with its own confirmation
   );
 }
 
@@ -318,7 +336,11 @@ function renderChrome(): void {
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
-        locked ? null : h("button", { type: "button", class: "tab-edit", title: "Edit view", "aria-label": `Edit view ${v.name}`, onclick: () => editView(v) }, "✎"),
+        locked ? null : viewMenuButton(v.name, {
+          onEdit: () => editView(v),
+          onDelete: () => void confirmDeleteView(v),
+          deleteDisabledReason: views.length <= 1 ? "You need at least one view" : undefined,
+        }),
       ),
     ),
   );

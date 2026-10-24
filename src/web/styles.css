@@ -114,8 +114,22 @@ body {
   .tab-wrap { display: inline-flex; align-items: center; border-bottom: 2px solid transparent; }
   .tab-wrap.active { border-bottom-color: var(--accent); }
   .tab-wrap .tab, .tab-wrap .tab.active { border-bottom: 0; padding-right: 0.3rem; }
-  .tab-edit { color: var(--muted); background: none; cursor: pointer; padding: 0 0.4rem 0 0; font-size: 12px; }
-  .tab-edit:hover { color: var(--accent); }
+  .tab-menu { display: inline-flex; align-items: center; color: var(--muted); cursor: pointer; padding: 0 0.35rem 0 0; }
+  .tab-menu:hover, .tab-menu[aria-expanded="true"] { color: var(--accent); }
+  .tab-menu-svg { width: 16px; height: 16px; }
+  .menu { position: absolute; z-index: 40; min-width: 10rem; padding: 0.25rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; }
+  .menu-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; text-align: left; color: var(--text); cursor: pointer; font-size: 13px; }
+  .menu-item:hover:not([disabled]), .menu-item:focus-visible { background: rgba(148, 163, 184, 0.12); outline: none; }
+  .menu-item[disabled] { opacity: 0.45; cursor: default; }
+  .menu-danger { color: #fca5a5; }
+  .menu-svg { width: 15px; height: 15px; flex: none; }
+  .confirm-dialog { max-width: 26rem; padding: 1rem 1.1rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+  .confirm-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+  .confirm-title { font-size: 15px; font-weight: 600; margin-bottom: 0.4rem; }
+  .confirm-body { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+  .btn-danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+  .btn-danger:hover { background: #991b1b; }
   .tab-add { color: var(--accent); }
 
   .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; }
