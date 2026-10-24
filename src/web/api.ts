@@ -42,7 +42,7 @@ async function request(method: string, url: string): Promise<Response> {
     } catch {
       // keep status text
     }
-    throw new Error(msg);
+    throw Object.assign(new Error(msg), { status: res.status });
   }
   return res;
 }

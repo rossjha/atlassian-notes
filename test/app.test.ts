@@ -237,13 +237,17 @@ test("ticket detail renders markdown safely; copy kinds; orphans", async () => {
   }
 });
 
-test("jira failure on ticket detail is 502; unexpected error is 500 without details", async () => {
+test("ticket detail: Jira 404 is 404 not found; other jira failure is 502; unexpected error is 500 without details", async () => {
   const { JiraError } = await import("../src/server/jira.ts");
   const orig = jira.getIssueDetail;
   jira.getIssueDetail = async () => { throw new JiraError(404, ["Issue does not exist"]); };
+  const r404 = await fetch(base() + "/api/tickets/PAY-1");
+  assert.equal(r404.status, 404);
+  assert.deepEqual(await r404.json(), { error: "PAY-1 not found in Jira (deleted, or no permission)" });
+  jira.getIssueDetail = async () => { throw new JiraError(503, ["Service unavailable"]); };
   const r = await fetch(base() + "/api/tickets/PAY-1");
   assert.equal(r.status, 502);
-  assert.match((await r.json()).error, /does not exist/);
+  assert.match((await r.json()).error, /unavailable/);
   jira.getIssueDetail = async () => { throw new Error("secret /Users/x/token"); };
   const logged = test.mock.method(console, "error", () => {});
   const r2 = await fetch(base() + "/api/tickets/PAY-1");

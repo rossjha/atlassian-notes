@@ -20,6 +20,7 @@ let shell: HTMLElement | null = null;
 let openKey: string | null = null;
 let payload: TicketResponse | null = null;
 let fetchError: string | null = null;
+let fetchNotFound = false; // the server's 404 message is shown as-is
 let loading = false;
 let diskNotice = false;
 let fetchSeq = 0;
@@ -130,6 +131,7 @@ async function load(): Promise<void> {
   } catch (e) {
     if (seq !== fetchSeq || key !== openKey) return;
     fetchError = (e as Error).message;
+    fetchNotFound = (e as { status?: number }).status === 404;
   }
   loading = false;
   diskNotice = false;
@@ -298,7 +300,7 @@ function render(): void {
         ))),
     )));
   } else if (fetchError) {
-    left.append(h("div", { class: "error-bar", role: "alert" }, `Could not load ticket detail: ${fetchError}`));
+    left.append(h("div", { class: "error-bar", role: "alert" }, fetchNotFound ? fetchError : `Could not load ticket detail: ${fetchError}`));
   } else if (loading) {
     left.append(h("p", { class: "text-muted" }, "Loading…"));
   }

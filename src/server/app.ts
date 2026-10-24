@@ -239,7 +239,10 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       try {
         detail = await jira.getIssueDetail(b);
       } catch (err) {
-        if (err instanceof JiraError) return send(res, 502, { error: err.message });
+        if (err instanceof JiraError) {
+          if (err.status === 404) return send(res, 404, { error: `${b} not found in Jira (deleted, or no permission)` });
+          return send(res, 502, { error: err.message });
+        }
         throw err;
       }
       const note = await notes.readNote(b);
