@@ -1,6 +1,6 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { icon, refreshButton } from "./icons.ts";
-import { confirmDialog, viewMenuButton } from "./viewMenu.ts";
+import { confirmDialog, viewSettingsButton } from "./viewMenu.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
@@ -336,11 +336,6 @@ function renderChrome(): void {
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
-        locked ? null : viewMenuButton(v.name, {
-          onEdit: () => editView(v),
-          onDelete: () => void confirmDeleteView(v),
-          deleteDisabledReason: views.length <= 1 ? "You need at least one view" : undefined,
-        }),
       ),
     ),
   );
@@ -361,6 +356,13 @@ function renderChrome(): void {
       h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(fetchedAt)}`),
       refresh,
     );
+    if (!locked) {
+      headerEl.append(viewSettingsButton(view.name, {
+        onEdit: () => editView(view),
+        onDelete: () => void confirmDeleteView(view),
+        deleteDisabledReason: views.length <= 1 ? "You need at least one view" : undefined,
+      }));
+    }
     if (jqlHadFocus && jqlEditor) jqlEditor.el.focus();
   }
   if (orphans.length > 0) {

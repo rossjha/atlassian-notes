@@ -30,16 +30,16 @@ document.addEventListener("keydown", (e) => {
 });
 window.addEventListener("resize", () => closeMenu());
 
-/** The ⋯ button on a view tab, opening a small Edit / Delete menu. */
-export function viewMenuButton(viewName: string, actions: ViewMenuActions): HTMLElement {
+/** The settings cog in the view header, opening a small Edit / Delete menu for the active view. */
+export function viewSettingsButton(viewName: string, actions: ViewMenuActions): HTMLElement {
   const btn = h("button", {
     type: "button",
-    class: "tab-menu",
-    title: "View options",
-    "aria-label": `Options for view ${viewName}`,
+    class: "icon-btn",
+    title: "View settings",
+    "aria-label": `Settings for view ${viewName}`,
     "aria-haspopup": "menu",
     "aria-expanded": "false",
-  }, icon("ellipsisHorizontal", "tab-menu-svg"));
+  }, icon("cog6Tooth", "icon-btn-svg"));
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
     if (openMenu?.anchor === btn) return closeMenu();
@@ -58,7 +58,8 @@ export function viewMenuButton(viewName: string, actions: ViewMenuActions): HTML
     document.body.append(el);
     const r = btn.getBoundingClientRect();
     el.style.setProperty("top", `${r.bottom + window.scrollY + 4}px`);
-    el.style.setProperty("left", `${r.left + window.scrollX}px`);
+    // Right-align under the cog, which sits at the far right of the header.
+    el.style.setProperty("left", `${Math.max(8, r.right + window.scrollX - el.offsetWidth)}px`);
     btn.setAttribute("aria-expanded", "true");
     openMenu = { el, anchor: btn };
     el.querySelector<HTMLElement>(".menu-item:not([disabled])")?.focus();
