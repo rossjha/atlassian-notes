@@ -121,7 +121,7 @@ body {
   .menu-item[disabled] { opacity: 0.45; cursor: default; }
   .menu-danger { color: #fca5a5; }
   .menu-svg { width: 15px; height: 15px; flex: none; }
-  .confirm-dialog { max-width: 26rem; padding: 1rem 1.1rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
+  .confirm-dialog { margin: auto; max-width: 26rem; padding: 1rem 1.1rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; }
   .confirm-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   .confirm-title { font-size: 15px; font-weight: 600; margin-bottom: 0.4rem; }
   .confirm-body { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
@@ -145,7 +145,7 @@ body {
   .fb-text { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 0.2rem 0.4rem; font: inherit; }
   .fb-count { margin-left: auto; }
 
-  .ve-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(38rem, 94vw); max-height: 90vh; }
+  .ve-dialog { margin: auto; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(38rem, 94vw); max-height: 90vh; }
   .ve-dialog::backdrop { background: rgba(2, 6, 23, 0.7); }
   .ve-form { display: flex; flex-direction: column; gap: 0.35rem; padding: 1rem; }
   .ve-title { font-size: 15px; font-weight: 600; margin-bottom: 0.25rem; }
