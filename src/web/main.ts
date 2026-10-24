@@ -1,4 +1,4 @@
-import type { ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
+import type { BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { h, relativeTime } from "./dom.ts";
@@ -22,6 +22,9 @@ let saveError: string | null = null;
 let rowsLoaded = false;
 // Inline JQL editor in the view header; kept across renderChrome() so typing survives re-renders.
 let jqlEditor: { viewId: string; el: HTMLTextAreaElement } | null = null;
+let boardKeys = new Set<string>();
+let boardLocked = true; // disabled until GET /api/board succeeds
+let boardSeq = 0;
 const refreshingIds = new Set<string>();
 let rowsSeq = 0;
 let sort: SortState | null = null;
@@ -287,6 +290,50 @@ onEditorsIdle(() => {
   if (renderDeferred) renderBody();
 });
 
+function applyBoard(b: BoardResponse): void {
+  boardKeys = new Set(Object.values(b.cards).flatMap((cs) => cs.map((c) => c.key)));
+  boardLocked = b.locked;
+}
+
+async function loadBoard(): Promise<void> {
+  const seq = ++boardSeq;
+  try {
+    const b = await api.board();
+    if (seq !== boardSeq) return;
+    applyBoard(b);
+  } catch {
+    if (seq !== boardSeq) return;
+    boardLocked = true; // errors surface on the board tab
+  }
+  renderBody();
+}
+
+function toggleStar(key: string): void {
+  if (boardLocked) return;
+  const starred = boardKeys.has(key);
+  const previous = boardKeys;
+  boardKeys = new Set(previous);
+  if (starred) boardKeys.delete(key);
+  else boardKeys.add(key);
+  boardSeq++; // supersede any in-flight board fetch
+  renderBody();
+  api.boardOp({ op: starred ? "remove" : "add", key }).then(
+    (b) => {
+      boardSeq++;
+      applyBoard(b); // server truth, including concurrent changes
+      saveError = null;
+      renderChrome();
+      renderBody();
+    },
+    (e: Error) => {
+      boardKeys = previous;
+      saveError = e.message;
+      renderChrome();
+      renderBody();
+    },
+  );
+}
+
 function renderBody(): void {
   // Never rebuild the table under an open editor; apply the latest state once it closes.
   if (isEditing()) {
@@ -300,12 +347,16 @@ function renderBody(): void {
     tableEl.replaceChildren(h("p", { class: "empty-state" }, configError ? "" : "No views configured."));
     return;
   }
+  const tableHandlers: TableHandlers = {
+    ...handlers,
+    star: { isStarred: (k) => boardKeys.has(k), toggle: toggleStar, disabled: boardLocked },
+  };
   let shown = applyFilters(rows, view.filters);
   const locked = viewsLocked();
   if (locked) filterEl.replaceChildren();
   else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
-  renderTable(tableEl, view, shown, columns, locked ? { ...handlers, onToggleDisplay: undefined } : handlers, sort);
+  renderTable(tableEl, view, shown, columns, locked ? { ...tableHandlers, onToggleDisplay: undefined } : tableHandlers, sort);
 }
 
 async function loadConfig(): Promise<void> {
@@ -394,6 +445,9 @@ function onLive(e: LiveEvent): void {
     case "columns":
       void loadConfig();
       break;
+    case "board":
+      void loadBoard();
+      break;
     case "orphans":
       void loadOrphans();
       break;
@@ -407,3 +461,4 @@ setInterval(() => {
 connectLive(onLive);
 void loadConfig();
 void loadOrphans();
+void loadBoard();

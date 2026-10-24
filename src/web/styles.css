@@ -48,6 +48,12 @@ body {
   .col-summary { min-width: 18rem; }
   .col-note, .col-groom { min-width: 16rem; max-width: 26rem; }
   .num { font-variant-numeric: tabular-nums; }
+  .ticket-grid th.col-star, .ticket-grid td.col-star { width: 2rem; min-width: 2rem; max-width: 2rem; padding: 0.3rem 0; text-align: center; }
+  .ticket-grid th.col-star { color: var(--accent); }
+  .star-btn { background: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  .star-btn:hover:not(:disabled) { color: var(--text); }
+  .star-btn.on { color: var(--accent); }
+  .star-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); text-decoration: none; white-space: nowrap; }
   .key:hover { text-decoration: underline; }
 

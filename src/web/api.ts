@@ -1,4 +1,4 @@
-import type { ColumnsConfig, GroomFile, IssueDetail, NoteFile, Row, View } from "../shared/types.ts";
+import type { BoardOp, BoardResponse, ColumnsConfig, GroomFile, IssueDetail, NoteFile, Row, View } from "../shared/types.ts";
 
 export interface ConfigResponse {
   views: View[];
@@ -45,6 +45,13 @@ async function request(method: string, url: string): Promise<Response> {
     throw new Error(msg);
   }
   return res;
+}
+
+async function postJson(url: string, payload: unknown): Promise<Response> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  if (res.ok) return res;
+  const b = (await res.json().catch(() => ({}))) as { error?: string };
+  throw new Error(b.error ?? `${res.status} ${res.statusText}`);
 }
 
 export type SaveResult =
@@ -104,6 +111,15 @@ export const api = {
   },
   async ticket(key: string): Promise<TicketResponse> {
     return (await request("GET", `/api/tickets/${encodeURIComponent(key)}`)).json() as Promise<TicketResponse>;
+  },
+  async board(): Promise<BoardResponse> {
+    return (await request("GET", "/api/board")).json() as Promise<BoardResponse>;
+  },
+  async boardOp(op: BoardOp): Promise<BoardResponse> {
+    return (await postJson("/api/board/ops", op)).json() as Promise<BoardResponse>;
+  },
+  async refreshBoard(): Promise<BoardResponse> {
+    return (await request("POST", "/api/board/refresh")).json() as Promise<BoardResponse>;
   },
   async orphans(): Promise<Orphan[]> {
     return ((await (await request("GET", "/api/orphans")).json()) as { orphans: Orphan[] }).orphans;

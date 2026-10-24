@@ -9,6 +9,8 @@ export interface TableHandlers {
   /** Omitted while views.yaml can't be saved: the toggle is then not shown. */
   onToggleDisplay?(columnId: string): void;
   onNoteSaved(): void;
+  /** Present when the personal board is available: adds a fixed first column of star toggles. */
+  star?: { isStarred(key: string): boolean; toggle(key: string): void; disabled: boolean };
 }
 
 export interface SortState {
@@ -20,6 +22,23 @@ function label(id: string, columns: ColumnsConfig): string {
   return BUILTIN_COLUMNS.find((c) => c.id === id)?.label ?? columns.custom[id]?.label ?? id;
 }
 
+function starCell(key: string, star: NonNullable<TableHandlers["star"]>): HTMLElement {
+  const on = star.isStarred(key);
+  const btn = h("button", {
+    type: "button",
+    class: `star-btn${on ? " on" : ""}`,
+    "aria-pressed": String(on),
+    "aria-label": `${on ? "Remove" : "Add"} ${key} ${on ? "from" : "to"} my board`,
+    title: star.disabled ? "board.yaml has an error" : on ? "Remove from my board" : "Add to my board",
+    onclick: (e: Event) => {
+      e.stopPropagation();
+      star.toggle(key);
+    },
+  }, on ? "★" : "☆");
+  if (star.disabled) btn.setAttribute("disabled", "");
+  return h("td", { class: "col-star" }, btn);
+}
+
 export function renderTable(
   container: HTMLElement,
   view: View,
@@ -29,7 +48,9 @@ export function renderTable(
   sort: SortState | null = null,
 ): void {
   const visible: ColumnSetting[] = view.columns.filter((c) => !c.hidden);
+  const star = handlers.star;
   const head = h("tr", {},
+    star ? h("th", { class: "col-star", "aria-label": "My board" }, "★") : null,
     ...visible.map((c) => {
       const active = sort?.columnId === c.id;
       return h("th", { class: `col-${c.id}${active ? " sorted" : ""}`, "aria-sort": active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none" },
@@ -53,7 +74,7 @@ export function renderTable(
   );
   const body = h("tbody", {},
     ...rows.map((row) =>
-      h("tr", {}, ...visible.map((c) => {
+      h("tr", {}, star ? starCell(row.ticket.key, star) : null, ...visible.map((c) => {
         const td = h("td", { class: `col-${c.id}` }, renderCell(row, c, columns));
         const custom = columns.custom[c.id];
         const rerender = (): void => {
