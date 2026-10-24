@@ -43,8 +43,9 @@ export function withPageTransition(dir: NavDir | null, update: () => void, pageE
   const before = document.querySelector<HTMLElement>(".tab-indicator")?.getBoundingClientRect();
   update();
   const easing = getComputedStyle(document.documentElement).getPropertyValue("--motion-ease").trim() || "ease-out";
-  const enter = motionMs("--motion-enter", 360);
-  const from = dir === "forward" ? "32px 0" : "-32px 0";
+  // Tab switches use the slower page duration and a 48px travel so the slide is noticeable but still quick.
+  const enter = motionMs("--motion-page", 480);
+  const from = dir === "forward" ? "48px 0" : "-48px 0";
   for (const el of pageEls) {
     if (el.isConnected && !el.hidden) el.animate([{ opacity: 0, translate: from }, { opacity: 1, translate: "0 0" }], { duration: enter, easing });
   }

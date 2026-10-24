@@ -361,9 +361,9 @@ nav.tabs { view-transition-name: an-tabs; }
     animation-timing-function: var(--motion-ease);
   }
   :root[data-nav-dir="forward"]:not([data-motion="off"])::view-transition-old(root) { animation: forge-out-left var(--motion-exit) var(--motion-ease-exit) both; }
-  :root[data-nav-dir="forward"]:not([data-motion="off"])::view-transition-new(root) { animation: forge-in-right var(--motion-enter) var(--motion-ease) both; }
+  :root[data-nav-dir="forward"]:not([data-motion="off"])::view-transition-new(root) { animation: forge-in-right var(--motion-page) var(--motion-ease) both; }
   :root[data-nav-dir="back"]:not([data-motion="off"])::view-transition-old(root) { animation: forge-out-right var(--motion-exit) var(--motion-ease-exit) both; }
-  :root[data-nav-dir="back"]:not([data-motion="off"])::view-transition-new(root) { animation: forge-in-left var(--motion-enter) var(--motion-ease) both; }
+  :root[data-nav-dir="back"]:not([data-motion="off"])::view-transition-new(root) { animation: forge-in-left var(--motion-page) var(--motion-ease) both; }
 
   /* Drawer: the panel slides in from the right over a fading backdrop; .dr-closing (drawer.ts) plays it backwards. */
   :root:not([data-motion="off"]) .dr-backdrop { animation: forge-fade-in var(--motion-enter) var(--motion-ease) both; }
