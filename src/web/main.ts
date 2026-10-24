@@ -11,6 +11,8 @@ import { isEditing, onEditorsIdle } from "./editors.ts";
 import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
+import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
+import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
@@ -162,8 +164,38 @@ const handlers: TableHandlers = {
       },
     );
   },
+  onResizeColumn(columnId, width) {
+    updateActiveColumns((cs) => setColumnWidth(cs, columnId, width));
+  },
+  onMoveColumn(columnId, toVisibleIndex) {
+    updateActiveColumns((cs) => moveColumn(cs, columnId, toVisibleIndex));
+  },
   onNoteSaved: () => void loadRows(),
 };
+
+/** Optimistically changes the active view's columns and saves the full latest views list; reverts on failure. */
+function updateActiveColumns(change: (cs: View["columns"]) => View["columns"]): void {
+  const view = activeView();
+  if (!view || viewsLocked()) return;
+  const cols = change(view.columns);
+  if (cols === view.columns) return;
+  const previous = views;
+  const next = views.map((v) => (v.id === view.id ? { ...v, columns: cols } : v));
+  views = next;
+  renderBody();
+  api.saveViews(next).then(
+    () => {
+      saveError = null;
+      renderChrome();
+    },
+    (e: Error) => {
+      if (views === next) views = previous;
+      saveError = e.message;
+      renderChrome();
+      renderBody();
+    },
+  );
+}
 
 function remembered(): string | null {
   try {
@@ -452,6 +484,9 @@ onEditorsIdle(() => {
 onDragIdle(() => {
   if (renderDeferred) renderBody();
 });
+onColumnDragIdle(() => {
+  if (renderDeferred) renderBody();
+});
 
 function applyBoard(b: BoardResponse): void {
   boardData = b;
@@ -573,7 +608,7 @@ const boardHandlers: BoardHandlers = {
 function renderBody(): void {
   drawerSyncStar(); // the drawer's ★ follows the board even while a table render is deferred
   // Never rebuild the table under an open editor; apply the latest state once it closes.
-  if (isEditing() || isDragging()) {
+  if (isEditing() || isDragging() || isColumnDragging()) {
     renderDeferred = true;
     return;
   }
@@ -607,7 +642,7 @@ function renderBody(): void {
   if (locked) filterEl.replaceChildren();
   else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
-  renderTable(tableEl, view, shown, columns, locked ? { ...tableHandlers, onToggleDisplay: undefined } : tableHandlers, sort);
+  renderTable(tableEl, view, shown, columns, locked ? { ...tableHandlers, onToggleDisplay: undefined, onResizeColumn: undefined, onMoveColumn: undefined } : tableHandlers, sort);
 }
 
 async function loadConfig(): Promise<void> {

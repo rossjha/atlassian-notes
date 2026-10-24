@@ -167,6 +167,29 @@ body {
   .link-btn:hover { color: var(--accent); }
 
   .th-inner { display: flex; align-items: center; }
+
+  /* Explicit column widths (views.yaml `width`). The table stays table-layout:auto (see table.ts); a sized
+     column's cells carry --col-w, and their content is capped to it so its min-content can't widen the column.
+     This also lifts the automatic note/groom caps below: the content follows the column width instead. */
+  .ticket-grid .col-sized { width: var(--col-w); min-width: var(--col-w); max-width: var(--col-w); overflow: hidden; overflow-wrap: anywhere; }
+  .ticket-grid td.col-sized > * { max-width: calc(var(--col-w) - 1rem); }
+  .ticket-grid td.col-sized .note-box, .ticket-grid td.col-sized .groom-box { max-width: none; }
+  .ticket-grid td.col-sized > .editor-wrap { width: 100%; }
+  .ticket-grid td.col-sized .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+  .ticket-grid th.col-sized > .th-inner { max-width: var(--col-w); }
+  .ticket-grid th.col-sized .th-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Resize handle on each header's right edge, with an accent line on hover/focus/drag. */
+  .ticket-grid th { position: relative; }
+  .th-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 7px; cursor: col-resize; touch-action: none; z-index: 1; outline: none; }
+  .th-resize::after { content: ""; position: absolute; top: 20%; bottom: 20%; right: 0; width: 2px; border-radius: 1px; background: transparent; transition: background-color 120ms; }
+  .th-resize:hover::after, .th-resize:focus-visible::after, .th-resize.active::after { top: 0; bottom: 0; background: var(--accent); }
+  html.cols-resizing, html.cols-resizing * { cursor: col-resize !important; user-select: none; }
+  /* Header drag to reorder: the dragged header dims and a vertical accent marker shows the drop gap. */
+  .ticket-grid th.th-draggable { touch-action: pan-y; }
+  .ticket-grid th.th-moving { opacity: 0.55; }
+  html.cols-dragging, html.cols-dragging * { cursor: grabbing !important; user-select: none; }
+  .col-drop-marker { position: fixed; width: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; z-index: 50; }
   .display-toggle { flex: none; padding: 0 0.4rem; color: var(--muted); cursor: pointer; background: none; font-size: 12px; }
   .display-toggle:hover { color: var(--accent); }
   .ticket-grid td.editable { cursor: text; }

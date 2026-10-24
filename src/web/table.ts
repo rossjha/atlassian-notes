@@ -1,5 +1,6 @@
 import { BUILTIN_COLUMNS, type ColumnSetting, type ColumnsConfig, type Row, type View } from "../shared/types.ts";
 import { renderCell } from "./cells.ts";
+import { applyColumnWidth, attachColumnControls } from "./columnDrag.ts";
 import { h } from "./dom.ts";
 import { editCustom, editNote } from "./editors.ts";
 
@@ -9,6 +10,9 @@ export interface TableHandlers {
   /** Omitted while views.yaml can't be saved: the toggle is then not shown. */
   onToggleDisplay?(columnId: string): void;
   onNoteSaved(): void;
+  /** Both omitted while views.yaml can't be saved: no resize handles and no header dragging. */
+  onResizeColumn?(columnId: string, width: number | null): void;
+  onMoveColumn?(columnId: string, toVisibleIndex: number): void;
   /** Present when the personal board is available: adds a fixed first column of star toggles. */
   star?: { isStarred(key: string): boolean; toggle(key: string): void; disabled: boolean; locked?: boolean };
 }
@@ -53,7 +57,7 @@ export function renderTable(
     star ? h("th", { class: "col-star", "aria-label": "On Kanban" }, "★") : null,
     ...visible.map((c) => {
       const active = sort?.columnId === c.id;
-      return h("th", { class: `col-${c.id}${active ? " sorted" : ""}`, "aria-sort": active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none" },
+      const th = h("th", { class: `col-${c.id}${active ? " sorted" : ""}`, "aria-sort": active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none" },
         h("div", { class: "th-inner" },
           h("button", { type: "button", class: "th-btn", onclick: () => handlers.onSort(c.id) },
             label(c.id, columns),
@@ -70,12 +74,15 @@ export function renderTable(
             : null,
         ),
       );
+      applyColumnWidth([th], c.width);
+      return th;
     }),
   );
   const body = h("tbody", {},
     ...rows.map((row) =>
       h("tr", {}, star ? starCell(row.ticket.key, star) : null, ...visible.map((c) => {
         const td = h("td", { class: `col-${c.id}` }, renderCell(row, c, columns));
+        applyColumnWidth([td], c.width);
         const custom = columns.custom[c.id];
         const rerender = (): void => {
           td.replaceChildren(renderCell(row, c, columns));
@@ -98,7 +105,11 @@ export function renderTable(
       })),
     ),
   );
-  const table = h("table", { class: "ticket-grid" }, h("thead", {}, head), body);
+  // Layout: the table stays `table-layout: auto` so columns without a width keep sizing to their content.
+  // A column with an explicit width gets `.col-sized` + `--col-w` on its th/td cells (see styles.css):
+  // width/min/max-width on the cells and a cap on their content, so nothing inside can widen it past --col-w.
+  // (table-layout: fixed would make widths stick too, but would split the rest evenly among auto columns.)
+  const table = h("table", { class: "ticket-grid" }, h("thead", {}, head), body) as HTMLTableElement;
   table.addEventListener("click", (e) => {
     const a = (e.target as Element).closest("a[data-open]");
     if (!a) return;
@@ -108,5 +119,9 @@ export function renderTable(
     handlers.onOpen(a.getAttribute("data-open")!);
   });
   container.replaceChildren(table);
+  const { onResizeColumn, onMoveColumn } = handlers;
+  if (onResizeColumn && onMoveColumn) {
+    attachColumnControls(table, visible, star ? 1 : 0, (id) => label(id, columns), { onResize: onResizeColumn, onMove: onMoveColumn });
+  }
   if (rows.length === 0) container.append(h("p", { class: "empty-state" }, "No tickets."));
 }
