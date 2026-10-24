@@ -112,3 +112,18 @@ test("saveViews then loadViews round-trips", async () => {
   assert.deepEqual(await loadViews(dir, columns), views);
   assert.deepEqual((await fs.readdir(dir)).filter((n) => n.includes(".tmp-")), []);
 });
+
+test("prototype property names are not treated as custom columns", async (t) => {
+  await ensureDataDir(dir, "PAY", examples);
+  const columns = await loadColumns(dir);
+  t.mock.method(console, "warn", () => {});
+  await fs.writeFile(path.join(dir, "views.yaml"), "views:\n  - {id: a, name: A, jql: x, columns: [{id: key}, {id: constructor}]}\n");
+  assert.deepEqual((await loadViews(dir, columns))[0].columns, [{ id: "key" }]);
+  await fs.writeFile(
+    path.join(dir, "views.yaml"),
+    "views:\n  - {id: a, name: A, jql: x, columns: [], filters: {toString: {op: empty}}}\n",
+  );
+  await assert.rejects(loadViews(dir, columns), ConfigFileError);
+  await fs.writeFile(path.join(dir, "columns.yaml"), "custom:\n  __proto__:\n    label: P\n    type: text\n");
+  await assert.rejects(loadColumns(dir), ConfigFileError);
+});

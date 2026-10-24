@@ -85,6 +85,7 @@ export async function loadColumns(notesDir: string): Promise<ColumnsConfig> {
   const rawCustom = root.custom ?? {};
   if (!isObj(rawCustom)) throw new ConfigFileError(file, "custom must be a mapping");
   for (const [id, def] of Object.entries(rawCustom)) {
+    if (id === "__proto__") throw new ConfigFileError(file, `custom column id "__proto__" is not allowed`);
     if (BUILTIN_IDS.has(id)) throw new ConfigFileError(file, `custom column "${id}" clashes with a built-in column`);
     if (!isObj(def) || typeof def.label !== "string") throw new ConfigFileError(file, `custom column "${id}" needs a label`);
     if (def.type === "text") {
@@ -151,7 +152,7 @@ export async function loadViews(notesDir: string, columns: ColumnsConfig): Promi
     for (const rc of Array.isArray(rv.columns) ? rv.columns : []) {
       const c: Obj = typeof rc === "string" ? { id: rc } : isObj(rc) ? rc : {};
       if (typeof c.id !== "string") throw new ConfigFileError(file, `view "${id}" has a column without an id`);
-      if (!BUILTIN_IDS.has(c.id) && !(c.id in columns.custom)) {
+      if (!BUILTIN_IDS.has(c.id) && !Object.hasOwn(columns.custom, c.id)) {
         console.warn(`${file}: view "${id}" ignores unknown column "${c.id}"`);
         continue;
       }
@@ -164,7 +165,7 @@ export async function loadViews(notesDir: string, columns: ColumnsConfig): Promi
     const rawFilters = rv.filters ?? {};
     if (!isObj(rawFilters)) throw new ConfigFileError(file, `view "${id}" filters must be a mapping`);
     for (const [col, fv] of Object.entries(rawFilters)) {
-      if (!(col in columns.custom)) throw new ConfigFileError(file, `view "${id}" filters on "${col}", which is not a custom column`);
+      if (!Object.hasOwn(columns.custom, col)) throw new ConfigFileError(file, `view "${id}" filters on "${col}", which is not a custom column`);
       filters[col] = parseFilter(file, col, fv);
     }
     return { id, name, jql, limit, columns: cols, filters };
