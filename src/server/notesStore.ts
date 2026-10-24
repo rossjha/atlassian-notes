@@ -11,6 +11,13 @@ export type WriteResult =
 
 type Kind = "notes" | "groom";
 
+export async function atomicWrite(file: string, content: string): Promise<void> {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  const tmp = `${file}.tmp-${process.pid}`;
+  await fs.writeFile(tmp, content, "utf8");
+  await fs.rename(tmp, file);
+}
+
 function isMissing(e: unknown): boolean {
   return (e as NodeJS.ErrnoException)?.code === "ENOENT";
 }
@@ -201,10 +208,7 @@ export class NotesStore {
   }
 
   private async write(file: string, content: string): Promise<WriteResult> {
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp-${process.pid}`;
-    await fs.writeFile(tmp, content, "utf8");
-    await fs.rename(tmp, file);
+    await atomicWrite(file, content);
     return { ok: true, mtimeMs: (await fs.stat(file)).mtimeMs };
   }
 }

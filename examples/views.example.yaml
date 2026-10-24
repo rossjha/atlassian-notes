@@ -1,0 +1,22 @@
+views:
+  - id: current
+    name: Current sprint
+    jql: project = {{PROJECT}} AND sprint in openSprints() ORDER BY rank
+    columns: &cols
+      - id: key
+      - id: summary
+      - id: status
+      - id: storyPoints
+      - id: note
+        display: truncate
+      - id: groom
+        display: truncate
+      - id: category
+  - id: next
+    name: Next sprint
+    jql: project = {{PROJECT}} AND sprint in futureSprints() ORDER BY rank
+    columns: *cols
+  - id: backlog
+    name: Backlog
+    jql: project = {{PROJECT}} AND sprint is EMPTY AND statusCategory != Done ORDER BY rank
+    columns: *cols

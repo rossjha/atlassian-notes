@@ -1,0 +1,15 @@
+jiraFields:
+  storyPoints: customfield_10016   # differs per Jira site
+  sprint: customfield_10020
+  # acceptanceCriteria: customfield_10000
+custom:
+  category:
+    label: Category
+    type: select
+    options:
+      Payments re-platform: "#5b8def"
+      Tech debt: "#e5b45b"
+      Quick win: "#4caf7d"
+  ownerGuess:
+    label: Owner guess
+    type: text
