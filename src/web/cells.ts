@@ -61,6 +61,12 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
       if (row.flags.jiraNewerThanGroom) wrap.append(dot("Jira changed after this groom was written"));
       return wrap;
     }
+    case "noteUpdated":
+    case "groomed": {
+      const ms = cellValue(row, setting.id);
+      if (typeof ms !== "number") return plain(null);
+      return h("span", { class: "text-muted", title: new Date(ms).toLocaleString() }, relativeTime(new Date(ms).toISOString()));
+    }
     default: {
       const def = columns.custom[setting.id];
       if (def && def.type === "select") {

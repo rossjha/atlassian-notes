@@ -17,6 +17,11 @@ export function cellValue(row: Row, columnId: string): string | number | null {
     case "updated": return t.updated;
     case "note": return row.note ? row.note.body : null;
     case "groom": return row.groom ? `${row.groom.readiness ?? ""} ${row.groom.summary}`.trim() : null;
+    case "noteUpdated": return row.note?.mtimeMs ?? null;
+    case "groomed": {
+      const ms = row.groom?.groomedAt ? Date.parse(row.groom.groomedAt) : NaN;
+      return Number.isNaN(ms) ? null : ms;
+    }
     default: return row.custom[columnId] ?? null;
   }
 }

@@ -18,7 +18,8 @@ export interface GroomFile extends NoteFile {
 
 export type BuiltinColumnId =
   | "key" | "summary" | "status" | "type" | "priority" | "assignee" | "reporter"
-  | "storyPoints" | "parent" | "labels" | "sprint" | "updated" | "note" | "groom";
+  | "storyPoints" | "parent" | "labels" | "sprint" | "updated" | "note" | "groom"
+  | "noteUpdated" | "groomed";
 
 export const BUILTIN_COLUMNS: { id: BuiltinColumnId; label: string }[] = [
   { id: "key", label: "Key" },
@@ -35,6 +36,8 @@ export const BUILTIN_COLUMNS: { id: BuiltinColumnId; label: string }[] = [
   { id: "updated", label: "Updated" },
   { id: "note", label: "My note" },
   { id: "groom", label: "Groom" },
+  { id: "noteUpdated", label: "Note updated" },
+  { id: "groomed", label: "Groomed" },
 ];
 
 export interface ColumnSetting {

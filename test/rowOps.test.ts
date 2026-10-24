@@ -70,3 +70,27 @@ test("cellValue formats", () => {
   assert.equal(cellValue(r, "assignee"), null);
   assert.equal(cellValue(r, "nope"), null);
 });
+
+test("cellValue noteUpdated and groomed return epoch ms or null", () => {
+  const bare = row("A-1");
+  assert.equal(cellValue(bare, "noteUpdated"), null);
+  assert.equal(cellValue(bare, "groomed"), null);
+  const full: Row = {
+    ...row("A-2"),
+    note: { body: "x", mtimeMs: 1760000000000 },
+    groom: { readiness: null, summary: "s", groomedAt: "2026-10-20T10:00:00Z" } as NonNullable<Row["groom"]>,
+  };
+  assert.equal(cellValue(full, "noteUpdated"), 1760000000000);
+  assert.equal(cellValue(full, "groomed"), Date.parse("2026-10-20T10:00:00Z"));
+  const bad: Row = { ...row("A-3"), groom: { readiness: null, summary: "s", groomedAt: "nope" } as NonNullable<Row["groom"]> };
+  assert.equal(cellValue(bad, "groomed"), null);
+  const nullDate: Row = { ...row("A-4"), groom: { readiness: null, summary: "s", groomedAt: null } as NonNullable<Row["groom"]> };
+  assert.equal(cellValue(nullDate, "groomed"), null);
+});
+
+test("sortRows by noteUpdated desc puts newest first and no-note rows last", () => {
+  const withNote = (key: string, mtimeMs: number): Row => ({ ...row(key), note: { body: "b", mtimeMs } });
+  const rows = [row("A-1"), withNote("A-2", 1000), withNote("A-3", 3000), withNote("A-4", 2000)];
+  assert.deepEqual(keys(sortRows(rows, "noteUpdated", "desc")), ["A-3", "A-4", "A-2", "A-1"]);
+  assert.deepEqual(keys(sortRows(rows, "noteUpdated", "asc")), ["A-2", "A-4", "A-3", "A-1"]);
+});
