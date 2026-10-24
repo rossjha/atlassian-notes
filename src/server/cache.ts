@@ -48,4 +48,29 @@ export class ViewCache {
     }
     return out;
   }
+
+  /** Every ticket in every cache file (views and the board). Later files win on duplicate keys. */
+  async allCachedTickets(): Promise<{ tickets: Map<string, Ticket>; cacheFiles: number }> {
+    const tickets = new Map<string, Ticket>();
+    let cacheFiles = 0;
+    let names: string[];
+    try {
+      names = (await fs.readdir(this.dir)).filter((n) => n.endsWith(".json")).sort();
+    } catch {
+      return { tickets, cacheFiles };
+    }
+    for (const name of names) {
+      try {
+        const v = JSON.parse(await fs.readFile(path.join(this.dir, name), "utf8"));
+        if (!v || !Array.isArray(v.tickets)) continue;
+        cacheFiles++;
+        for (const t of v.tickets as Ticket[]) {
+          if (t && typeof t.key === "string") tickets.set(t.key, t);
+        }
+      } catch {
+        // missing or corrupt
+      }
+    }
+    return { tickets, cacheFiles };
+  }
 }
