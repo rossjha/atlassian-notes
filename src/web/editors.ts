@@ -33,7 +33,7 @@ export interface NoteEditorOptions {
 
 export function editNote(cell: HTMLElement, row: Row, onDone: () => void, options: NoteEditorOptions = {}): void {
   const close = begin(onDone);
-  const original = row.note?.body ?? "";
+  let original = row.note?.body ?? "";
   let baseMtimeMs: number | null = row.note?.mtimeMs ?? null;
   let saving = false;
   let finished = false;
@@ -56,6 +56,7 @@ export function editNote(cell: HTMLElement, row: Row, onDone: () => void, option
       actions.append(
         h("button", { type: "button", class: "btn", onclick: () => {
           area.value = current.body;
+          original = current.body;
           baseMtimeMs = current.mtimeMs;
           message.hidden = true;
           actions.hidden = true;
@@ -81,7 +82,16 @@ export function editNote(cell: HTMLElement, row: Row, onDone: () => void, option
     saving = false;
     if (result.kind === "ok") {
       baseMtimeMs = result.mtimeMs;
+      original = text;
       row.note = { body: text, mtimeMs: result.mtimeMs };
+      message.hidden = true;
+      actions.hidden = true;
+      if (area.value !== text) {
+        // Typed while the save was in flight: keep the editor open so nothing is lost.
+        // If focus already left (that blur was ignored while saving), save the rest now.
+        if (document.activeElement !== area) void save();
+        return;
+      }
       finished = true;
       close();
     } else if (result.kind === "conflict") {
