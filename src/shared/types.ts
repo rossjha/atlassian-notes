@@ -75,6 +75,9 @@ export interface ColumnsConfig {
   groomPrompt: string;
 }
 
+export interface TicketLink { type: string; direction: "inward" | "outward"; key: string }
+export interface TicketSprint { name: string; state: string }
+
 export interface Ticket {
   id: string;
   key: string;
@@ -90,6 +93,9 @@ export interface Ticket {
   parent: { key: string; summary: string } | null;
   labels: string[];
   sprint: string | null;
+  // Optional: caches written before these existed lack them. The Jira client always sets both.
+  sprints?: TicketSprint[];
+  links?: TicketLink[];
   updated: string;
 }
 

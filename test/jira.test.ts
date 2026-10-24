@@ -177,3 +177,34 @@ test("ticket updated and comment created are normalised to ISO UTC; invalid stay
   const bad = fakeFetch([{ body: JSON.stringify(issue) }]);
   assert.equal((await client(bad.fn).getIssueDetail("PAY-1")).ticket.updated, "not a date");
 });
+
+test("requests issuelinks", async () => {
+  const { fn, calls } = fakeFetch([{ body: fixture("search-links.json") }]);
+  await client(fn).search("x", 10);
+  assert.ok(new URL(calls[0].url).searchParams.get("fields")!.split(",").includes("issuelinks"));
+});
+
+test("maps issue links and sprints", async () => {
+  const { fn } = fakeFetch([{ body: fixture("search-links.json") }]);
+  const [t] = await client(fn).search("x", 10);
+  assert.deepEqual(t.links, [
+    { type: "blocks", direction: "outward", key: "PAY-2" },
+    { type: "is blocked by", direction: "inward", key: "PAY-3" },
+  ]);
+  assert.deepEqual(t.sprints, [{ name: "Sprint 11", state: "closed" }, { name: "Sprint 12", state: "active" }]);
+  assert.equal(t.sprint, "Sprint 12");
+});
+
+test("issue without issuelinks or sprints maps to empty arrays", async () => {
+  const { fn } = fakeFetch([{ body: fixture("search-links.json") }]);
+  const [, t] = await client(fn).search("x", 10);
+  assert.deepEqual(t.links, []);
+  assert.deepEqual(t.sprints, []);
+});
+
+test("ignores malformed link entries and nameless sprints", async () => {
+  const { fn } = fakeFetch([{ body: fixture("search-links.json") }]);
+  const [, , t] = await client(fn).search("x", 10);
+  assert.deepEqual(t.links, [{ type: "relates to", direction: "outward", key: "PAY-6" }]);
+  assert.deepEqual(t.sprints, [{ name: "Sprint 13", state: "" }]);
+});

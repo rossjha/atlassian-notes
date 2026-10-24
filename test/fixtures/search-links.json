@@ -1,0 +1,38 @@
+{
+  "isLast": true,
+  "issues": [
+    {
+      "id": "20001",
+      "key": "PAY-1",
+      "fields": {
+        "summary": "Has links and sprints",
+        "customfield_10020": [
+          { "id": 11, "name": "Sprint 11", "state": "closed" },
+          { "id": 12, "name": "Sprint 12", "state": "active" }
+        ],
+        "issuelinks": [
+          { "type": { "inward": "is blocked by", "outward": "blocks" }, "outwardIssue": { "key": "PAY-2" } },
+          { "type": { "inward": "is blocked by", "outward": "blocks" }, "inwardIssue": { "key": "PAY-3" } }
+        ]
+      }
+    },
+    {
+      "id": "20002",
+      "key": "PAY-4",
+      "fields": { "summary": "Bare" }
+    },
+    {
+      "id": "20003",
+      "key": "PAY-5",
+      "fields": {
+        "summary": "Malformed",
+        "customfield_10020": [{ "state": "active" }, { "name": "Sprint 13" }, null],
+        "issuelinks": [
+          { "type": { "inward": "is blocked by", "outward": "blocks" } },
+          { "type": { "inward": "is blocked by", "outward": "blocks" }, "outwardIssue": { "key": 7 } },
+          { "type": { "inward": "relates to", "outward": "relates to" }, "outwardIssue": { "key": "PAY-6" } }
+        ]
+      }
+    }
+  ]
+}

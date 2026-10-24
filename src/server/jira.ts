@@ -1,4 +1,4 @@
-import type { ColumnsConfig, IssueDetail, Ticket } from "../shared/types.ts";
+import type { ColumnsConfig, IssueDetail, Ticket, TicketLink } from "../shared/types.ts";
 import { adfToMarkdown } from "./markdown.ts";
 
 export class JiraError extends Error {
@@ -28,7 +28,7 @@ interface Opts {
 
 type Json = Record<string, any>;
 
-const BASE_FIELDS = ["summary", "status", "issuetype", "priority", "assignee", "reporter", "parent", "labels", "updated"];
+const BASE_FIELDS = ["summary", "status", "issuetype", "priority", "assignee", "reporter", "parent", "labels", "updated", "issuelinks"];
 
 /** Jira's "+0100" offsets sort wrongly as strings and don't parse everywhere; send ISO UTC. Invalid → raw. */
 function toIso(v: unknown): string {
@@ -96,6 +96,13 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
     const f: Json = issue.fields ?? {};
     const sp = opts.fields.storyPoints ? f[opts.fields.storyPoints] : null;
     const sprints: Json[] = Array.isArray(f[opts.fields.sprint]) ? f[opts.fields.sprint] : [];
+    const links: TicketLink[] = [];
+    for (const l of Array.isArray(f.issuelinks) ? f.issuelinks : []) {
+      // Jira words the relationship from this ticket's side: outward phrase for outwardIssue, inward for inwardIssue.
+      const out = l?.outwardIssue, inn = l?.inwardIssue;
+      if (typeof out?.key === "string") links.push({ type: String(l.type?.outward ?? ""), direction: "outward", key: out.key });
+      else if (typeof inn?.key === "string") links.push({ type: String(l.type?.inward ?? ""), direction: "inward", key: inn.key });
+    }
     const sprint = sprints.find((s) => s?.state === "active") ?? sprints[sprints.length - 1];
     return {
       id: String(issue.id),
@@ -112,6 +119,10 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
       parent: f.parent ? { key: f.parent.key, summary: f.parent.fields?.summary ?? "" } : null,
       labels: Array.isArray(f.labels) ? f.labels : [],
       sprint: sprint?.name ?? null,
+      sprints: sprints
+        .filter((s) => typeof s?.name === "string")
+        .map((s) => ({ name: s.name as string, state: typeof s.state === "string" ? s.state : "" })),
+      links,
       updated: toIso(f.updated),
     };
   }
