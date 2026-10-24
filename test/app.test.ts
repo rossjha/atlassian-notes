@@ -272,6 +272,14 @@ test("PUT /api/views validates, saves, and never writes invalid input", async ()
   assert.deepEqual(cfg.views.map((v: { id: string }) => v.id), ["mine"]);
 });
 
+test("PUT /api/views round-trips a column width into views.yaml", async () => {
+  const views = [{ id: "mine", name: "Mine", jql: "x", limit: 10, columns: [{ id: "key", width: 64 }, { id: "summary" }], filters: {} }];
+  assert.equal((await put("/api/views", { views })).status, 204);
+  assert.match(fs.readFileSync(path.join(dir, "views.yaml"), "utf8"), /width: 64/);
+  const cfg = await (await fetch(base() + "/api/config")).json();
+  assert.deepEqual(cfg.views[0].columns, [{ id: "key", width: 64 }, { id: "summary" }]);
+});
+
 test("corrupt views.yaml gives 200 with error naming the file", async () => {
   fs.writeFileSync(path.join(dir, "views.yaml"), "views: [unclosed\n  - : :");
   const res = await fetch(base() + "/api/config");

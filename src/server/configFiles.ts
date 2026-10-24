@@ -127,6 +127,16 @@ function parseFilter(file: string, col: string, v: unknown): FilterValue {
   }
 }
 
+const MIN_WIDTH = 24;
+const MAX_WIDTH = 4000;
+
+/** A column width in whole px, or null when it is not a number in [MIN_WIDTH, MAX_WIDTH]. */
+function parseWidth(v: unknown): number | null {
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const w = Math.round(v);
+  return w >= MIN_WIDTH && w <= MAX_WIDTH ? w : null;
+}
+
 export async function loadViews(notesDir: string, columns: ColumnsConfig): Promise<View[]> {
   const file = path.join(notesDir, "views.yaml");
   const raw = await readYaml(file);
@@ -167,6 +177,11 @@ export function validateViews(
       const s: ColumnSetting = { id: c.id };
       if (c.hidden === true) s.hidden = true;
       if (c.display === "truncate" || c.display === "expand") s.display = c.display;
+      if (c.width !== undefined && c.width !== null) {
+        const w = parseWidth(c.width);
+        if (w === null) console.warn(`${file}: view "${id}" column "${c.id}" ignores invalid width ${JSON.stringify(c.width) ?? String(c.width)}`);
+        else s.width = w;
+      }
       cols.push(s);
     }
     const filters: Filters = {};

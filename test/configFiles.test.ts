@@ -136,3 +136,41 @@ test("prototype property names are not treated as custom columns", async (t) => 
   await fs.writeFile(path.join(dir, "columns.yaml"), "custom:\n  __proto__:\n    label: P\n    type: text\n");
   await assert.rejects(loadColumns(dir), ConfigFileError);
 });
+
+test("column widths round-trip through saveViews/loadViews", async () => {
+  await ensureDataDir(dir, "PAY", examples);
+  const columns = await loadColumns(dir);
+  const views = [
+    {
+      id: "w",
+      name: "W",
+      jql: "x",
+      limit: 10,
+      columns: [{ id: "key", width: 40 }, { id: "note", display: "expand" as const, width: 320 }, { id: "summary" }],
+      filters: {},
+    },
+  ];
+  await saveViews(dir, views);
+  assert.match(await fs.readFile(path.join(dir, "views.yaml"), "utf8"), /width: 320/);
+  assert.deepEqual(await loadViews(dir, columns), views);
+});
+
+test("invalid column widths are dropped with a warning, keeping the column", async (t) => {
+  await ensureDataDir(dir, "PAY", examples);
+  const columns = await loadColumns(dir);
+  const warn = t.mock.method(console, "warn", () => {});
+  await fs.writeFile(
+    path.join(dir, "views.yaml"),
+    "views:\n  - {id: a, name: A, jql: x, columns: [{id: key, width: wide}, {id: summary, width: 10}, {id: status, width: 5000}, {id: type, width: -3}, {id: note, width: 200.6}, {id: groom, width: .nan}]}\n",
+  );
+  const views = await loadViews(dir, columns);
+  assert.deepEqual(views[0].columns, [
+    { id: "key" },
+    { id: "summary" },
+    { id: "status" },
+    { id: "type" },
+    { id: "note", width: 201 },
+    { id: "groom" },
+  ]);
+  assert.equal(warn.mock.callCount(), 5);
+});

@@ -44,6 +44,8 @@ export interface ColumnSetting {
   id: string;
   hidden?: boolean;
   display?: "truncate" | "expand";
+  /** Explicit column width in whole px; absent = automatic width. */
+  width?: number;
 }
 
 export type FilterValue =
