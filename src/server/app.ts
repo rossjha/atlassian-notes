@@ -156,7 +156,15 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     }
     if (method === "PUT" && a === "views" && segs.length === 1) {
       const body = await readJson(req);
-      const columns = await loadColumns(config.notesDir);
+      let columns: ColumnsConfig;
+      try {
+        // Never overwrite a config file the user broke by hand: refuse until it parses again.
+        columns = await loadColumns(config.notesDir);
+        await loadViews(config.notesDir, columns);
+      } catch (err) {
+        if (err instanceof ConfigFileError) return send(res, 409, { error: `${err.message} — fix the file before saving views` });
+        throw err;
+      }
       let views: View[];
       try {
         views = validateViews(body, columns);

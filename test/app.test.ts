@@ -253,6 +253,33 @@ test("corrupt views.yaml gives 200 with error naming the file", async () => {
   assert.match((await res.json()).error, /views\.yaml/);
 });
 
+test("PUT /api/views refuses with 409 and leaves a corrupt views.yaml byte-identical", async () => {
+  const file = path.join(dir, "views.yaml");
+  const broken = "views: [unclosed\n  - : :";
+  fs.writeFileSync(file, broken);
+  const views = [{ id: "mine", name: "Mine", jql: "assignee = me", limit: 10, columns: [{ id: "key" }], filters: {} }];
+  const res = await put("/api/views", { views });
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /views\.yaml/);
+  assert.equal(fs.readFileSync(file, "utf8"), broken);
+});
+
+test("PUT /api/views refuses with 409 when columns.yaml is corrupt", async () => {
+  const vfile = path.join(dir, "views.yaml");
+  const cfile = path.join(dir, "columns.yaml");
+  const cBefore = fs.readFileSync(cfile, "utf8");
+  fs.writeFileSync(vfile, "views: []\n");
+  fs.writeFileSync(cfile, "custom: [oops\n");
+  try {
+    const res = await put("/api/views", { views: [{ id: "mine", name: "Mine", jql: "x" }] });
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).error, /columns\.yaml/);
+    assert.equal(fs.readFileSync(vfile, "utf8"), "views: []\n");
+  } finally {
+    fs.writeFileSync(cfile, cBefore);
+  }
+});
+
 test("SSE delivers a groom event when a groom file is written", async () => {
   const ac = new AbortController();
   const res = await fetch(base() + "/api/events", { signal: ac.signal });

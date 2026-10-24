@@ -52,7 +52,7 @@ const handlers: TableHandlers = {
   },
   onToggleDisplay(columnId) {
     const view = activeView();
-    if (!view) return;
+    if (!view || viewsLocked()) return;
     const next = views.map((v) =>
       v.id !== view.id
         ? v
@@ -90,13 +90,18 @@ function remember(id: string): void {
   }
 }
 
+/** While a config file is broken, nothing may save views (the server would refuse with 409 anyway). */
+function viewsLocked(): boolean {
+  return configError !== null;
+}
+
 function activeView(): View | null {
   return views.find((v) => v.id === activeId) ?? null;
 }
 
 function onFiltersChanged(filters: Filters): void {
   const view = activeView();
-  if (!view) return;
+  if (!view || viewsLocked()) return;
   const previous = views;
   const next = views.map((v) => (v.id === view.id ? { ...v, filters } : v));
   views = next; // optimistic: the chips and counts update at once
@@ -147,7 +152,7 @@ async function deleteView(id: string): Promise<void> {
 }
 
 function editView(view: View | null): void {
-  if (!columns) return;
+  if (!columns || viewsLocked()) return;
   openViewEditor(
     view,
     columns,
@@ -170,15 +175,16 @@ function selectTab(id: string): void {
 }
 
 function renderChrome(): void {
+  const locked = viewsLocked();
   tabsEl.replaceChildren(
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
-        h("button", { type: "button", class: "tab-edit", title: "Edit view", "aria-label": `Edit view ${v.name}`, onclick: () => editView(v) }, "✎"),
+        locked ? null : h("button", { type: "button", class: "tab-edit", title: "Edit view", "aria-label": `Edit view ${v.name}`, onclick: () => editView(v) }, "✎"),
       ),
     ),
-    h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"),
   );
+  if (!locked) tabsEl.append(h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"));
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {
@@ -231,9 +237,11 @@ function renderBody(): void {
     return;
   }
   let shown = applyFilters(rows, view.filters);
-  renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged);
+  const locked = viewsLocked();
+  if (locked) filterEl.replaceChildren();
+  else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
-  renderTable(tableEl, view, shown, columns, handlers, sort);
+  renderTable(tableEl, view, shown, columns, locked ? { ...handlers, onToggleDisplay: undefined } : handlers, sort);
 }
 
 async function loadConfig(): Promise<void> {

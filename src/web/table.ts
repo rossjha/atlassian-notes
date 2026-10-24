@@ -6,7 +6,8 @@ import { editCustom, editNote } from "./editors.ts";
 export interface TableHandlers {
   onOpen(key: string): void;
   onSort(columnId: string): void;
-  onToggleDisplay(columnId: string): void;
+  /** Omitted while views.yaml can't be saved: the toggle is then not shown. */
+  onToggleDisplay?(columnId: string): void;
   onNoteSaved(): void;
 }
 
@@ -37,13 +38,13 @@ export function renderTable(
             label(c.id, columns),
             active ? h("span", { class: "sort-ind" }, sort!.dir === "asc" ? " ▲" : " ▼") : null,
           ),
-          c.id === "note" || c.id === "groom"
+          (c.id === "note" || c.id === "groom") && handlers.onToggleDisplay
             ? h("button", {
                 type: "button",
                 class: "display-toggle",
                 title: c.display === "expand" ? "Showing full text; click to truncate" : "Truncated; click to show full text",
                 "aria-label": `${label(c.id, columns)} column: ${c.display === "expand" ? "expanded" : "truncated"}`,
-                onclick: () => handlers.onToggleDisplay(c.id),
+                onclick: () => handlers.onToggleDisplay?.(c.id),
               }, c.display === "expand" ? "▤" : "▭")
             : null,
         ),
