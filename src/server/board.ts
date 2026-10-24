@@ -55,7 +55,7 @@ export function parseBoard(text: string, file: string): BoardFile {
     if (list === null || list === undefined) return;
     if (!Array.isArray(list)) throw new ConfigFileError(file, `cards for "${col}" must be a list`);
     for (const item of list) {
-      const key = String(item);
+      const key = String(item).trim().toUpperCase();
       if (!isValidKey(key)) {
         console.warn(`${file}: ignoring invalid ticket key "${key}"`);
         continue;

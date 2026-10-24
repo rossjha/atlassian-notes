@@ -166,3 +166,8 @@ test("broken board.yaml rejects and is left byte-identical; queue is not wedged"
 test("eventForPath maps board.yaml", () => {
   assert.deepEqual(eventForPath("board.yaml"), { type: "board" });
 });
+
+test("parseBoard upper-cases and trims hand-typed keys (deduping after normalising)", () => {
+  const b = parseBoard("columns: [A, B]\ncards:\n  A: [pay-1, ' Pay-2 ']\n  B: [PAY-1]\n", "board.yaml");
+  assert.deepEqual(b.cards, { A: ["PAY-1", "PAY-2"], B: [] });
+});
