@@ -46,55 +46,63 @@ export async function reconcile(deps: {
   const orphanKeys = new Set<string>();
   const nowIso = now.toISOString();
 
-  for (const key of [...unseen.keys()].sort()) {
-    const jiraId = unseen.get(key) ?? null;
-
-    const match = jiraId !== null ? byId.get(jiraId) : undefined;
-    if (match) {
-      if ((await notes.renameKey(key, match.key)) === "renamed") {
-        renamed.push([key, match.key]);
-        delete state.checked[key];
-      }
-      continue;
+  const tryRename = async (key: string, target: string): Promise<void> => {
+    const res = await notes.renameKey(key, target);
+    if (res === "renamed") {
+      renamed.push([key, target]);
+      delete state.checked[key];
+    } else if (res === "target-exists") {
+      state.checked[key] = { at: nowIso, orphan: true };
+      orphanKeys.add(key);
     }
+  };
 
-    const prev = state.checked[key];
-    if (prev && now.getTime() - new Date(prev.at).getTime() < DAY_MS && now.getTime() >= new Date(prev.at).getTime()) {
-      if (prev.orphan) orphanKeys.add(key);
-      continue;
-    }
-
-    try {
-      const brief = await jira.getIssueBrief(jiraId ?? key);
-      if (brief === null) {
-        state.checked[key] = { at: nowIso, orphan: true };
-        orphanKeys.add(key);
-      } else if (brief.key !== key) {
-        if ((await notes.renameKey(key, brief.key)) === "renamed") {
-          renamed.push([key, brief.key]);
-          delete state.checked[key];
+  try {
+    for (const key of [...unseen.keys()].sort()) {
+      const jiraId = unseen.get(key) ?? null;
+      const prev = state.checked[key];
+      try {
+        const match = jiraId !== null ? byId.get(jiraId) : undefined;
+        if (match) {
+          await tryRename(key, match.key);
+          continue;
         }
-      } else {
-        state.checked[key] = { at: nowIso, orphan: false };
-      }
-    } catch (e) {
-      if (e instanceof JiraError && e.status === 404) {
-        state.checked[key] = { at: nowIso, orphan: true };
-        orphanKeys.add(key);
-      } else if (e instanceof JiraError) {
-        // transient: keep previous state untouched
+
+        if (prev && now.getTime() >= new Date(prev.at).getTime() && now.getTime() - new Date(prev.at).getTime() < DAY_MS) {
+          if (prev.orphan) orphanKeys.add(key);
+          continue;
+        }
+
+        try {
+          const brief = await jira.getIssueBrief(jiraId ?? key);
+          if (brief === null) {
+            state.checked[key] = { at: nowIso, orphan: true };
+            orphanKeys.add(key);
+          } else if (brief.key !== key) {
+            await tryRename(key, brief.key);
+          } else {
+            state.checked[key] = { at: nowIso, orphan: false };
+          }
+        } catch (e) {
+          if (e instanceof JiraError && e.status === 404) {
+            state.checked[key] = { at: nowIso, orphan: true };
+            orphanKeys.add(key);
+          } else {
+            throw e;
+          }
+        }
+      } catch {
+        // skip this key this round; keep its previous state
         if (prev?.orphan) orphanKeys.add(key);
-      } else {
-        throw e;
       }
     }
+  } finally {
+    // forget checks for keys that no longer have files
+    for (const key of Object.keys(state.checked)) {
+      if (!unseen.has(key)) delete state.checked[key];
+    }
+    await atomicWrite(statePath, JSON.stringify(state));
   }
-
-  // forget checks for keys that no longer have files
-  for (const key of Object.keys(state.checked)) {
-    if (!unseen.has(key)) delete state.checked[key];
-  }
-  await atomicWrite(statePath, JSON.stringify(state));
 
   return { renamed, orphans: [...orphanKeys].sort() };
 }

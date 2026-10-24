@@ -80,9 +80,38 @@ test("refreshAll reconciles, emits orphans on change, and overlapping calls shar
   assert.equal(events.filter((e) => e.type === "orphans").length, 1);
 });
 
-test("start/stop schedules and clears without crashing on failure", async () => {
-  const { r } = setup(async () => { throw new Error("x"); });
+test("one view failing to persist does not abort the cycle", async () => {
+  const { dir, notes, r, events } = setup(async () => [t("100", "PAY-1")]);
+  const views: View[] = [{ ...view, id: "bad" }, { ...view, id: "good" }];
+  const r2 = new Refresher({
+    jira: { search: async () => [t("100", "PAY-1")], getIssueBrief: async () => null, getIssueDetail: async () => { throw new Error("x"); } } as JiraClient,
+    cache: new ViewCache(dir), notes, getViews: async () => views, onChange: (e) => events.push(e),
+    statePath: path.join(dir, ".cache", "reconcile.json"),
+  });
+  fs.mkdirSync(path.join(dir, ".cache", "views", "bad.json"), { recursive: true });
+  const orig = console.error;
+  const logged: unknown[][] = [];
+  console.error = (...a: unknown[]) => { logged.push(a); };
+  try {
+    await r2.refreshAll();
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(logged.length, 1);
+  assert.ok(events.some((e) => e.type === "rows" && e.viewId === "good"));
+  assert.ok(fs.existsSync(path.join(dir, ".cache", "reconcile.json")));
+  void r;
+});
+
+test("start ticks on an interval and stop halts it", async () => {
+  let calls = 0;
+  const { r } = setup(async () => { calls++; return []; });
   r.start(0.0005);
-  await new Promise((res) => setTimeout(res, 100));
+  await new Promise((res) => setTimeout(res, 150));
   r.stop();
+  assert.ok(calls >= 1);
+  await new Promise((res) => setTimeout(res, 50));
+  const after = calls;
+  await new Promise((res) => setTimeout(res, 100));
+  assert.equal(calls, after);
 });

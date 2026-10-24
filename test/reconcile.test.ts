@@ -32,7 +32,7 @@ function countFiles(dir: string): number {
 const NOW = new Date("2026-10-24T10:00:00Z");
 
 test("renames by jira_id match without calling the API", async () => {
-  const { dir, notes, statePath } = setup();
+  const { notes, statePath } = setup();
   await notes.writeNoteBody("PAY-1", "hello", { baseMtimeMs: null, jiraId: "100" });
   const { jira, calls } = fakeJira(async () => null);
   const seen = new Map([["NEW-5", ticket("100", "NEW-5")]]);
@@ -42,7 +42,6 @@ test("renames by jira_id match without calling the API", async () => {
   assert.equal(calls.length, 0);
   assert.ok(fs.existsSync(notes.notePath("NEW-5")));
   assert.ok(!fs.existsSync(notes.notePath("PAY-1")));
-  assert.ok(dir);
 });
 
 test("unseen note with null brief is an orphan; second run within 24h makes no call; file kept", async () => {
@@ -98,4 +97,48 @@ test("note and groom for the same key are reconciled once", async () => {
   const { jira, calls } = fakeJira(async () => null);
   await reconcile({ jira, notes, seen: new Map(), statePath, now: NOW });
   assert.equal(calls.length, 1);
+});
+
+test("jira_id rename collision flags the old key as orphan", async () => {
+  const { notes, statePath } = setup();
+  await notes.writeNoteBody("OLD-1", "a", { baseMtimeMs: null, jiraId: "100" });
+  await notes.writeNoteBody("NEW-1", "b", { baseMtimeMs: null, jiraId: "100" });
+  const { jira, calls } = fakeJira(async () => null);
+  const seen = new Map([["NEW-1", ticket("100", "NEW-1")]]);
+  const r = await reconcile({ jira, notes, seen, statePath, now: NOW });
+  assert.deepEqual(r.renamed, []);
+  assert.deepEqual(r.orphans, ["OLD-1"]);
+  assert.equal(calls.length, 0);
+  assert.ok(fs.existsSync(notes.notePath("OLD-1")));
+});
+
+test("brief rename collision flags orphan and is cached for 24h", async () => {
+  const { notes, statePath } = setup();
+  await notes.writeNoteBody("OLD-2", "a", { baseMtimeMs: null, jiraId: "200" });
+  await notes.writeNoteBody("NEW-2", "b", { baseMtimeMs: null, jiraId: "200" });
+  const { jira, calls } = fakeJira(async () => ({ id: "200", key: "NEW-2" }));
+  const r1 = await reconcile({ jira, notes, seen: new Map(), statePath, now: NOW });
+  assert.deepEqual(r1.orphans, ["OLD-2"]);
+  const before = calls.length;
+  const r2 = await reconcile({ jira, notes, seen: new Map(), statePath, now: new Date(NOW.getTime() + 1000) });
+  assert.deepEqual(r2.orphans, ["OLD-2"]);
+  assert.equal(calls.length, before);
+});
+
+test("an error on one key does not lose renames already done or state", async () => {
+  const { notes, statePath } = setup();
+  await notes.writeNoteBody("A-1", "a", { baseMtimeMs: null, jiraId: "1" });
+  await notes.writeNoteBody("B-1", "b", { baseMtimeMs: null, jiraId: "2" });
+  await notes.writeNoteBody("C-1", "c", { baseMtimeMs: null, jiraId: "3" });
+  const { jira } = fakeJira(async (id) => {
+    if (id === "1") return { id, key: "bad key" };
+    if (id === "2") return { id, key: "B-2" };
+    return null;
+  });
+  const r = await reconcile({ jira, notes, seen: new Map(), statePath, now: NOW });
+  assert.deepEqual(r.renamed, [["B-1", "B-2"]]);
+  assert.deepEqual(r.orphans, ["C-1"]);
+  const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(state.checked["C-1"].orphan, true);
+  assert.ok(fs.existsSync(notes.notePath("A-1")));
 });

@@ -68,7 +68,13 @@ export class Refresher {
   private async runAll(): Promise<void> {
     const { jira, cache, notes, getViews, onChange, statePath } = this.deps;
     const views = await getViews();
-    for (const v of views) await this.refreshView(v);
+    for (const v of views) {
+      try {
+        await this.refreshView(v);
+      } catch (e) {
+        console.error(`refresh of view ${v.id} failed:`, e instanceof Error ? e.message : e);
+      }
+    }
     const seen = await cache.allTickets(views.map((v) => v.id));
     const { renamed, orphans } = await reconcile({ jira, notes, seen, statePath, now: this.now() });
     for (const [, newKey] of renamed) {
