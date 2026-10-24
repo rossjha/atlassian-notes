@@ -1,6 +1,6 @@
 import { BUILTIN_COLUMNS, type ColumnSetting, type ColumnsConfig, type Row, type View } from "../shared/types.ts";
 import { renderCell } from "./cells.ts";
-import { applyColumnWidth, attachColumnControls } from "./columnDrag.ts";
+import { applyColumnWidth, attachColumnControls, syncAllSized } from "./columnDrag.ts";
 import { h } from "./dom.ts";
 import { editCustom, editNote } from "./editors.ts";
 
@@ -107,9 +107,13 @@ export function renderTable(
   );
   // Layout: the table stays `table-layout: auto` so columns without a width keep sizing to their content.
   // A column with an explicit width gets `.col-sized` + `--col-w` on its th/td cells (see styles.css):
-  // width/min/max-width on the cells and a cap on their content, so nothing inside can widen it past --col-w.
+  // width = min-width = max-width = --col-w on the cells, and their content is capped to it, so the column's
+  // min-content never exceeds --col-w and its specified width wins in both directions (wider than the
+  // content too). Spare table width goes to the auto columns; when every column is sized the table drops
+  // `width: 100%` (.all-sized) so it doesn't stretch them. Wider than the page scrolls in .table-wrap.
   // (table-layout: fixed would make widths stick too, but would split the rest evenly among auto columns.)
   const table = h("table", { class: "ticket-grid" }, h("thead", {}, head), body) as HTMLTableElement;
+  syncAllSized(table);
   table.addEventListener("click", (e) => {
     const a = (e.target as Element).closest("a[data-open]");
     if (!a) return;

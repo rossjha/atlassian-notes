@@ -169,15 +169,20 @@ body {
   .th-inner { display: flex; align-items: center; }
 
   /* Explicit column widths (views.yaml `width`). The table stays table-layout:auto (see table.ts); a sized
-     column's cells carry --col-w, and their content is capped to it so its min-content can't widen the column.
-     This also lifts the automatic note/groom caps below: the content follows the column width instead. */
-  .ticket-grid .col-sized { width: var(--col-w); min-width: var(--col-w); max-width: var(--col-w); overflow: hidden; overflow-wrap: anywhere; }
+     column's cells carry --col-w as width, min-width and max-width, and their content is capped to it so its
+     min-content can't widen the column; the specified width then holds whether wider or narrower than the
+     content. This also lifts the automatic note/groom caps below: the content follows the column width.
+     Overflowing nowrap text (keys, pills, header labels) ellipsises. */
+  .ticket-grid .col-sized { width: var(--col-w); min-width: var(--col-w); max-width: var(--col-w); }
+  .ticket-grid td.col-sized { overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; }
   .ticket-grid td.col-sized > * { max-width: calc(var(--col-w) - 1rem); }
   .ticket-grid td.col-sized .note-box, .ticket-grid td.col-sized .groom-box { max-width: none; }
   .ticket-grid td.col-sized > .editor-wrap { width: 100%; }
   .ticket-grid td.col-sized .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+  /* The th itself doesn't clip (the header button's focus ring stays visible); the button ellipsises. */
   .ticket-grid th.col-sized > .th-inner { max-width: var(--col-w); }
   .ticket-grid th.col-sized .th-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .ticket-grid.all-sized { width: auto; }
 
   /* Resize handle on each header's right edge, with an accent line on hover/focus/drag. */
   .ticket-grid th { position: relative; }
@@ -186,7 +191,7 @@ body {
   .th-resize:hover::after, .th-resize:focus-visible::after, .th-resize.active::after { top: 0; bottom: 0; background: var(--accent); }
   html.cols-resizing, html.cols-resizing * { cursor: col-resize !important; user-select: none; }
   /* Header drag to reorder: the dragged header dims and a vertical accent marker shows the drop gap. */
-  .ticket-grid th.th-draggable { touch-action: pan-y; }
+  .ticket-grid th.th-draggable, .ticket-grid th.th-draggable .th-btn { cursor: grab; touch-action: pan-y; }
   .ticket-grid th.th-moving { opacity: 0.55; }
   html.cols-dragging, html.cols-dragging * { cursor: grabbing !important; user-select: none; }
   .col-drop-marker { position: fixed; width: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; z-index: 50; }

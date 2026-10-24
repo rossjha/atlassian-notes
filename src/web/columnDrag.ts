@@ -1,4 +1,4 @@
-import { clampColumnWidth, dropIndexToVisibleIndex, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "../shared/columnOps.ts";
+import { clampColumnWidth, dropIndexToVisibleIndex, MAX_COLUMN_WIDTH } from "../shared/columnOps.ts";
 import type { ColumnSetting } from "../shared/types.ts";
 import { h } from "./dom.ts";
 
@@ -10,6 +10,8 @@ export interface ColumnControls {
 }
 
 const DRAG_THRESHOLD_PX = 5;
+/** Smaller jitter than this doesn't count as a resize (so it can't save a width or eat a double-click). */
+const RESIZE_THRESHOLD_PX = 3;
 const KEY_STEP_PX = 16;
 
 let active = 0;
@@ -51,6 +53,17 @@ export function applyColumnWidth(cells: Iterable<HTMLElement>, width: number | n
   }
 }
 
+/**
+ * When every visible column has an explicit width, the table drops `width: 100%` (CSS .all-sized) so the
+ * spare space isn't spread across the sized columns; they then sum exactly to the table width.
+ */
+export function syncAllSized(table: HTMLTableElement): void {
+  const head = table.tHead?.rows[0];
+  if (!head) return;
+  const cols = [...head.cells].filter((c) => !c.classList.contains("col-star"));
+  table.classList.toggle("all-sized", cols.length > 0 && cols.every((c) => c.classList.contains("col-sized")));
+}
+
 function columnCells(table: HTMLTableElement, index: number): HTMLElement[] {
   const out: HTMLElement[] = [];
   for (const row of table.rows) {
@@ -90,6 +103,9 @@ export function attachColumnControls(
     th.classList.add("th-draggable");
     th.addEventListener("pointerdown", (e) => startMove(e, table, ths, i, c, ctl));
   });
+  // aria-valuenow: the rendered header widths, measured once now the table is laid out.
+  const widths = ths.map((th) => th.getBoundingClientRect().width);
+  ths.forEach((th, i) => th.querySelector(".th-resize")?.setAttribute("aria-valuenow", String(Math.round(widths[i]!))));
   if (refocusId !== null) {
     const i = visible.findIndex((c) => c.id === refocusId);
     refocusId = null;
@@ -116,8 +132,6 @@ function resizeHandle(
     title: "Drag to resize; double-click for automatic width",
   });
   const setNow = (w: number): void => handle.setAttribute("aria-valuenow", String(Math.round(w)));
-  setNow(c.width ?? MIN_COLUMN_WIDTH);
-  handle.addEventListener("focus", () => setNow(c.width ?? th.getBoundingClientRect().width));
   handle.addEventListener("click", (e) => e.stopPropagation());
   handle.addEventListener("dblclick", (e) => {
     e.stopPropagation();
@@ -134,29 +148,42 @@ function resizeHandle(
     const startW = th.getBoundingClientRect().width;
     let width = clampColumnWidth(c.id, startW);
     let moved = false;
+    let done = false;
     const end = begin();
     handle.setPointerCapture(e.pointerId);
     handle.classList.add("active");
     document.documentElement.classList.add("cols-resizing");
-    const onMove = (ev: PointerEvent): void => {
-      if (ev.pointerId !== e.pointerId) return;
-      if (ev.clientX !== startX) moved = true;
-      if (!moved) return;
-      width = clampColumnWidth(c.id, startW + ev.clientX - startX);
-      applyColumnWidth(cells, width);
-      setNow(width);
+    const show = (w: number | null | undefined): void => {
+      applyColumnWidth(cells, w);
+      syncAllSized(table);
     };
+    // Any way the gesture can end (up, cancel, lost capture, window blur, Esc, buttons released unseen)
+    // comes through here, and always end()s so a deferred render flushes.
     const finish = (commit: boolean): void => {
+      if (done) return;
+      done = true;
       handle.removeEventListener("pointermove", onMove);
       handle.removeEventListener("pointerup", onUp);
       handle.removeEventListener("pointercancel", onCancel);
+      handle.removeEventListener("lostpointercapture", onLost);
+      window.removeEventListener("blur", onBlur);
       document.removeEventListener("keydown", onKey, true);
       if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
       handle.classList.remove("active");
       document.documentElement.classList.remove("cols-resizing");
-      if (!commit || !moved) applyColumnWidth(cells, c.width);
+      const save = commit && moved && width !== c.width;
+      if (!save) show(c.width);
       end(); // before the commit, so the commit's re-render isn't deferred
-      if (commit && moved && width !== c.width) ctl.onResize(c.id, width);
+      if (save) ctl.onResize(c.id, width);
+    };
+    const onMove = (ev: PointerEvent): void => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (ev.buttons === 0) return finish(false); // the release happened somewhere we didn't see
+      if (!moved && Math.abs(ev.clientX - startX) < RESIZE_THRESHOLD_PX) return;
+      moved = true;
+      width = clampColumnWidth(c.id, startW + ev.clientX - startX);
+      show(width);
+      setNow(width);
     };
     const onUp = (ev: PointerEvent): void => {
       if (ev.pointerId === e.pointerId) finish(true);
@@ -164,6 +191,8 @@ function resizeHandle(
     const onCancel = (ev: PointerEvent): void => {
       if (ev.pointerId === e.pointerId) finish(false);
     };
+    const onLost = (): void => finish(false);
+    const onBlur = (): void => finish(false);
     const onKey = (ev: KeyboardEvent): void => {
       if (ev.key !== "Escape") return;
       ev.preventDefault();
@@ -173,6 +202,8 @@ function resizeHandle(
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp);
     handle.addEventListener("pointercancel", onCancel);
+    handle.addEventListener("lostpointercapture", onLost);
+    window.addEventListener("blur", onBlur);
     document.addEventListener("keydown", onKey, true);
   });
 
@@ -199,6 +230,7 @@ function resizeHandle(
     const base = kbWidth ?? th.getBoundingClientRect().width;
     kbWidth = clampColumnWidth(c.id, base + (e.key === "ArrowRight" ? KEY_STEP_PX : -KEY_STEP_PX));
     applyColumnWidth(columnCells(table, index), kbWidth);
+    syncAllSized(table);
     setNow(kbWidth);
   });
   handle.addEventListener("keyup", (e) => {
@@ -245,13 +277,35 @@ function startMove(
     th.classList.remove("th-moving");
     document.documentElement.classList.remove("cols-dragging");
   };
+  let done = false;
+  /** Ends the gesture (any way it can end) and always end()s so a deferred render flushes. */
+  const finish = (commit: boolean): void => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onCancel);
+    window.removeEventListener("blur", onCancel);
+    th.removeEventListener("lostpointercapture", onCancel);
+    document.removeEventListener("keydown", onKey, true);
+    if (th.hasPointerCapture(e.pointerId)) th.releasePointerCapture(e.pointerId);
+    clearVisuals();
+    if (!dragging) return; // a plain click: let it sort
+    end?.();
+    if (!commit || cancelled) return;
+    const to = dropIndexToVisibleIndex(from, gap);
+    if (to !== from) ctl.onMove(c.id, to);
+  };
   const onMove = (ev: PointerEvent): void => {
-    if (ev.pointerId !== e.pointerId || cancelled) return;
+    if (ev.pointerId !== e.pointerId) return;
+    if (ev.buttons === 0) return finish(false); // the release happened somewhere we didn't see
+    if (cancelled) return;
     if (!dragging) {
       if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
       dragging = true;
       end = begin();
       th.setPointerCapture(e.pointerId);
+      th.addEventListener("lostpointercapture", onCancel);
       th.classList.add("th-moving");
       document.documentElement.classList.add("cols-dragging");
       marker = h("div", { class: "col-drop-marker", "aria-hidden": "true" });
@@ -259,28 +313,14 @@ function startMove(
     }
     placeMarker(ev.clientX);
   };
-  const cleanup = (): void => {
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onCancel);
-    document.removeEventListener("keydown", onKey, true);
-    if (th.hasPointerCapture(e.pointerId)) th.releasePointerCapture(e.pointerId);
-    clearVisuals();
-  };
   const onUp = (ev: PointerEvent): void => {
     if (ev.pointerId !== e.pointerId) return;
-    cleanup();
-    if (!dragging) return; // a plain click: let it sort
-    suppressNextClick();
-    end?.();
-    if (cancelled) return;
-    const to = dropIndexToVisibleIndex(from, gap);
-    if (to !== from) ctl.onMove(c.id, to);
+    if (dragging) suppressNextClick();
+    finish(true);
   };
-  const onCancel = (ev: PointerEvent): void => {
-    if (ev.pointerId !== e.pointerId) return;
-    cleanup();
-    end?.();
+  const onCancel = (ev: Event): void => {
+    if (ev instanceof PointerEvent && ev.pointerId !== e.pointerId) return;
+    finish(false);
   };
   const onKey = (ev: KeyboardEvent): void => {
     if (ev.key !== "Escape" || !dragging) return;
@@ -292,5 +332,6 @@ function startMove(
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
   window.addEventListener("pointercancel", onCancel);
+  window.addEventListener("blur", onCancel);
   document.addEventListener("keydown", onKey, true);
 }

@@ -144,25 +144,10 @@ const handlers: TableHandlers = {
     renderBody();
   },
   onToggleDisplay(columnId) {
-    const view = activeView();
-    if (!view || viewsLocked()) return;
-    const next = views.map((v) =>
-      v.id !== view.id
-        ? v
-        : { ...v, columns: v.columns.map((c) => (c.id === columnId ? { ...c, display: c.display === "expand" ? "truncate" as const : "expand" as const } : c)) },
-    );
-    void api.saveViews(next).then(
-      () => {
-        views = next;
-        saveError = null;
-        renderChrome();
-        renderBody();
-      },
-      (e: Error) => {
-        saveError = e.message;
-        renderChrome();
-      },
-    );
+    updateActiveView((v) => ({
+      ...v,
+      columns: v.columns.map((c) => (c.id === columnId ? { ...c, display: c.display === "expand" ? "truncate" as const : "expand" as const } : c)),
+    }));
   },
   onResizeColumn(columnId, width) {
     updateActiveColumns((cs) => setColumnWidth(cs, columnId, width));
@@ -173,26 +158,61 @@ const handlers: TableHandlers = {
   onNoteSaved: () => void loadRows(),
 };
 
-/** Optimistically changes the active view's columns and saves the full latest views list; reverts on failure. */
 function updateActiveColumns(change: (cs: View["columns"]) => View["columns"]): void {
+  updateActiveView((v) => {
+    const cols = change(v.columns);
+    return cols === v.columns ? v : { ...v, columns: cols };
+  });
+}
+
+// All PUT /api/views calls go through one chain so they reach the server in order, each sending the
+// latest `views` at send time. While any are pending, loadConfig keeps the local (newer) views.
+let viewsSaveChain: Promise<void> = Promise.resolve();
+let pendingViewSaves = 0;
+let reloadAfterSaves = false;
+
+/**
+ * Queues a save of views.yaml. Without `change`, saves the current (already optimistically updated) views;
+ * if that fails, the views are reloaded from the server once the queue drains. With `change`, saves
+ * change(views) and applies it locally only on success.
+ */
+function saveViewsInOrder(change?: (vs: View[]) => View[]): Promise<void> {
+  pendingViewSaves++;
+  const run = viewsSaveChain.then(async () => {
+    try {
+      await api.saveViews(change ? change(views) : views);
+      if (change) views = change(views);
+    } catch (e) {
+      if (!change) reloadAfterSaves = true;
+      throw e;
+    } finally {
+      pendingViewSaves--;
+      if (pendingViewSaves === 0 && reloadAfterSaves) {
+        reloadAfterSaves = false;
+        void loadConfig(); // revert optimistic changes the server didn't take
+      }
+    }
+  });
+  viewsSaveChain = run.catch(() => {});
+  return run;
+}
+
+/** Optimistically changes the active view (from the CURRENT views) and queues a save; saveError on failure. */
+function updateActiveView(change: (v: View) => View): void {
   const view = activeView();
   if (!view || viewsLocked()) return;
-  const cols = change(view.columns);
-  if (cols === view.columns) return;
-  const previous = views;
-  const next = views.map((v) => (v.id === view.id ? { ...v, columns: cols } : v));
-  views = next;
+  const changed = change(view);
+  if (changed === view) return;
+  views = views.map((v) => (v.id === view.id ? changed : v));
   renderBody();
-  api.saveViews(next).then(
+  saveViewsInOrder().then(
     () => {
       saveError = null;
       renderChrome();
     },
     (e: Error) => {
-      if (views === next) views = previous;
       saveError = e.message;
       renderChrome();
-      renderBody();
     },
   );
 }
@@ -223,24 +243,7 @@ function activeView(): View | null {
 }
 
 function onFiltersChanged(filters: Filters): void {
-  const view = activeView();
-  if (!view || viewsLocked()) return;
-  const previous = views;
-  const next = views.map((v) => (v.id === view.id ? { ...v, filters } : v));
-  views = next; // optimistic: the chips and counts update at once
-  renderBody();
-  api.saveViews(next).then(
-    () => {
-      saveError = null;
-      renderChrome();
-    },
-    (e: Error) => {
-      if (views === next) views = previous;
-      saveError = e.message;
-      renderChrome();
-      renderBody();
-    },
-  );
+  updateActiveView((v) => ({ ...v, filters })); // optimistic: the chips and counts update at once
 }
 
 async function saveEditedView(edited: View, isNew: boolean): Promise<void> {
@@ -251,9 +254,7 @@ async function saveEditedView(edited: View, isNew: boolean): Promise<void> {
     if (!old) throw new Error("This view no longer exists (it was changed on disk). Close the dialog and reopen it.");
     saved.filters = old.filters; // keep filters changed since the dialog opened
   }
-  const next = isNew ? [...views, saved] : views.map((v) => (v.id === id ? saved : v));
-  await api.saveViews(next);
-  views = next;
+  await saveViewsInOrder((vs) => (isNew ? [...vs, saved] : vs.map((v) => (v.id === id ? { ...saved, filters: v.filters } : v)))); // keep filters changed meanwhile
   const needsRefresh = isNew || old?.jql !== saved.jql || old?.limit !== saved.limit;
   if (isNew) selectTab(id);
   else {
@@ -264,10 +265,8 @@ async function saveEditedView(edited: View, isNew: boolean): Promise<void> {
 }
 
 async function deleteView(id: string): Promise<void> {
-  const next = views.filter((v) => v.id !== id);
-  await api.saveViews(next);
-  views = next;
-  if (activeId === id && next[0]) selectTab(next[0].id);
+  await saveViewsInOrder((vs) => vs.filter((v) => v.id !== id));
+  if (activeId === id && views[0]) selectTab(views[0].id);
   else {
     renderChrome();
     renderBody();
@@ -648,7 +647,7 @@ function renderBody(): void {
 async function loadConfig(): Promise<void> {
   try {
     const cfg = await api.config();
-    views = cfg.views;
+    if (pendingViewSaves === 0) views = cfg.views; // else a queued save holds newer views; its own live event reloads
     columns = cfg.columns;
     configError = cfg.error;
   } catch (e) {
