@@ -1,3 +1,4 @@
+import { assertNodeVersion } from "../src/server/nodeVersion.ts";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { dirname } from "node:path";
@@ -82,6 +83,7 @@ async function fetchCloudId(siteUrl: string): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  assertNodeVersion();
   const target = envFilePath(process.env, os.homedir());
   let muted = false;
   const out = new Writable({

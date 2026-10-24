@@ -1,3 +1,4 @@
+import { assertNodeVersion } from "./nodeVersion.ts";
 import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -11,6 +12,8 @@ import { createJiraClient, type JiraClient } from "./jira.ts";
 import { NotesStore } from "./notesStore.ts";
 import { Refresher } from "./refresher.ts";
 import { watchNotesDir } from "./watcher.ts";
+
+assertNodeVersion(); // first statement: a clear message instead of an obscure failure on old Node
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 

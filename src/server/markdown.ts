@@ -151,7 +151,7 @@ const safeMarked = new Marked({
       const safe = safeHref(href);
       if (safe === null) return inner;
       const t = title ? ` title="${escapeHtml(title)}"` : "";
-      return `<a href="${escapeHtml(safe)}"${t}>${inner}</a>`;
+      return `<a href="${escapeHtml(safe)}"${t} target="_blank" rel="noopener noreferrer">${inner}</a>`;
     },
     image({ text }) {
       return escapeHtml(text);

@@ -115,3 +115,9 @@ test("renderMarkdownSafe renders task list items", () => {
 test("renderMarkdownSafe renders basic markdown", () => {
   assert.ok(renderMarkdownSafe("**b**").includes("<strong>b</strong>"));
 });
+
+test("renderMarkdownSafe opens links in a new tab without opener", () => {
+  const html = renderMarkdownSafe("[x](https://example.com)");
+  assert.ok(html.includes('<a href="https://example.com" target="_blank" rel="noopener noreferrer">x</a>'), html);
+  assert.ok(!renderMarkdownSafe("[x](javascript:alert(1))").includes("<a"));
+});

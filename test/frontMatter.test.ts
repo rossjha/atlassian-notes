@@ -42,3 +42,18 @@ test("isValidKey", () => {
     assert.equal(isValidKey(k), false, k);
   }
 });
+
+test("blank front matter block parses as empty front matter", () => {
+  const doc = parseFrontMatter("---\n\n---\nhello\n");
+  assert.deepEqual(doc.data, {});
+  assert.equal(doc.body, "hello\n");
+  assert.equal(doc.error, null);
+});
+
+test("comments-only front matter is a parse error that keeps the full text (never dropped on rewrite)", () => {
+  const text = "---\n# reviewed by Ann\n\n---\nhello\n";
+  const doc = parseFrontMatter(text);
+  assert.ok(doc.error);
+  assert.equal(doc.body, text);
+  assert.equal(doc.hasFrontMatter, true);
+});

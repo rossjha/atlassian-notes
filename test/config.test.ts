@@ -79,3 +79,15 @@ test("only reads the env file path, never ./.env", () => {
   assert.deepEqual(paths, [envFilePath({}, "/h")]);
   assert.ok(!paths.some((p) => p.startsWith(process.cwd())));
 });
+
+test("relative NOTES_DIR is rejected with a ConfigError (absolute and ~ paths accepted)", () => {
+  for (const bad of ["notes", "./data", "~other/x"]) {
+    assert.throws(
+      () => loadConfig({ NOTES_DIR: bad }, "/h", () => required),
+      (e: unknown) => e instanceof ConfigError && /NOTES_DIR/.test(e.message) && /absolute/.test(e.message),
+      bad,
+    );
+  }
+  assert.equal(loadConfig({ NOTES_DIR: "/abs/n" }, "/h", () => required).notesDir, "/abs/n");
+  assert.equal(loadConfig({ NOTES_DIR: "~" }, "/h", () => required).notesDir, "/h");
+});

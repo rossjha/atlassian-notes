@@ -35,7 +35,10 @@ export function parseFrontMatter(text: string): ParsedDoc {
   try {
     const parsed: unknown = parse(yamlText);
     if (parsed === null || parsed === undefined) {
-      return { data: {}, body, hasFrontMatter: true, error: null };
+      // Only a truly blank block is empty front matter. Comments-only (or `~`) would be
+      // lost on rewrite, so treat it as unparseable and leave the file alone.
+      if (yamlText.trim() === "") return { data: {}, body, hasFrontMatter: true, error: null };
+      throw new Error("front matter has no fields (only comments or null)");
     }
     if (typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("front matter must be a mapping");

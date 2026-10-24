@@ -222,3 +222,14 @@ test("listAll lists valid keys and ignores stray and tmp files", async () => {
 test("listAll on empty dir returns empty lists", async () => {
   assert.deepEqual(await store.listAll(), { notes: [], grooms: [] });
 });
+
+test("setNoteField refuses a comments-only front matter block and leaves the file byte-identical", async () => {
+  const p = store.notePath("PAY-3");
+  await fs.mkdir(path.dirname(p), { recursive: true });
+  const text = "---\n# keep me\n---\nbody\n";
+  await fs.writeFile(p, text);
+  const r = await store.setNoteField("PAY-3", "category", "a");
+  assert.ok(!r.ok && r.reason === "parse-error");
+  await store.ensureIdentity("PAY-3", "103");
+  assert.equal(await fs.readFile(p, "utf8"), text);
+});

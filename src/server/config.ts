@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 export interface Config {
   jiraBaseUrl: string;
@@ -102,13 +102,17 @@ export function loadConfig(
     );
   }
   const jiraBaseUrl = v.JIRA_BASE_URL!.replace(/\/+$/, "");
+  const notesDir = expandHome(v.NOTES_DIR ?? "~/atlassian-notes-data", home);
+  if (!isAbsolute(notesDir)) {
+    throw new ConfigError(`NOTES_DIR must be an absolute path or start with ~/ (got "${notesDir}") in ${path}.`);
+  }
   return {
     jiraBaseUrl,
     jiraApiBase: apiBaseFor(jiraBaseUrl, v.JIRA_CLOUD_ID),
     jiraEmail: v.JIRA_EMAIL!,
     jiraApiToken: v.JIRA_API_TOKEN!,
     defaultProject: v.JIRA_PROJECT!,
-    notesDir: expandHome(v.NOTES_DIR ?? "~/atlassian-notes-data", home),
+    notesDir,
     refreshMinutes: positiveInt(v.REFRESH_MINUTES, 15),
     port: positiveInt(v.PORT, 4317),
     openBrowser: !["false", "0", "no"].includes((v.OPEN_BROWSER ?? "true").toLowerCase()),
