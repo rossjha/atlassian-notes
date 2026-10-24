@@ -256,7 +256,8 @@ function startJqlEdit(view: View): void {
   el.value = view.jql;
   const fit = () => {
     el.style.setProperty("height", "auto");
-    el.style.setProperty("height", `${el.scrollHeight}px`);
+    // scrollHeight excludes the border, but box-sizing is border-box, so add it back or the text shifts.
+    el.style.setProperty("height", `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`);
   };
   el.addEventListener("input", fit);
   el.addEventListener("keydown", (e) => {
