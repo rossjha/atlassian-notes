@@ -249,3 +249,21 @@ test("schedule debounces", async () => {
   await new Promise((r) => setTimeout(r, 80));
   assert.equal(runs, 1);
 });
+
+test("sync called from a waiter's continuation never overlaps runs", async () => {
+  let active = 0;
+  let maxActive = 0;
+  let runs = 0;
+  const syncer = createTicketFileSyncer(async () => {
+    runs++;
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((r) => setTimeout(r, 10));
+    active--;
+  });
+  const first = syncer.sync().then(() => syncer.sync());
+  const second = syncer.sync();
+  await Promise.all([first, second]);
+  assert.equal(maxActive, 1);
+  assert.ok(runs >= 2);
+});

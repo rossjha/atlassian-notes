@@ -33,6 +33,7 @@ board.yaml            your personal board: columns and card placement
 columns.yaml          custom columns + Jira field mapping
 jira/notes/KEY.md     your notes
 jira/groom/KEY.md     groom output written by Claude (the app only reads it)
+jira/tickets/KEY.md   generated ticket files for Obsidian (overwritten each refresh)
 .cache/               last Jira results, so the app opens instantly
 ```
 

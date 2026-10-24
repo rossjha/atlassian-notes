@@ -157,13 +157,12 @@ export function createTicketFileSyncer(run: () => Promise<unknown>, debounceMs =
   };
 
   const sync = (): Promise<void> => {
+    if (next) return next;
     if (!current) return exec();
-    if (!next) {
-      next = current.then(() => {
-        next = null;
-        return exec();
-      });
-    }
+    next = current.then(() => {
+      next = null;
+      return exec();
+    });
     return next;
   };
 
