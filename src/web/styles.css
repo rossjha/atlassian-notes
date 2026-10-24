@@ -35,6 +35,12 @@ body {
   .icon-spin { animation: icon-spin 0.9s linear infinite; }
   @keyframes icon-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .icon-spin { animation: none; } }
+  .btn-icon { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .btn-svg { width: 14px; height: 14px; flex: none; }
+  .link-icon { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .link-svg { width: 12px; height: 12px; flex: none; }
+  .brand-claude { color: #d97757; }
+  .brand-jira { color: #2684ff; }
   .tabs-divider { align-self: center; color: var(--line); padding: 0 0.25rem; user-select: none; }
   .ticket-search-hint { font-size: 11px; color: #fca5a5; white-space: nowrap; }
   .star-btn.dr-star { flex: none; font-size: 18px; }

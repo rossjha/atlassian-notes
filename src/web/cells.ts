@@ -1,4 +1,5 @@
 import type { ColumnSetting, ColumnsConfig, Row } from "../shared/types.ts";
+import { icon } from "./icons.ts";
 import { cellValue } from "../shared/rowOps.ts";
 import { api } from "./api.ts";
 import { copyToClipboard, h, relativeTime } from "./dom.ts";
@@ -8,11 +9,13 @@ function dot(title: string): HTMLElement {
 }
 
 function copyPromptLink(key: string): HTMLElement {
-  const link = h("button", { type: "button", class: "link-btn" }, "copy groom prompt");
+  const text = h("span", {}, "copy groom prompt");
+  const link = h("button", { type: "button", class: "link-btn link-icon", title: "Copy the groom prompt for Claude" },
+    icon("claude", "link-svg brand-claude"), text);
   link.addEventListener("click", async (e) => {
     e.stopPropagation();
-    link.textContent = (await copyToClipboard(() => api.copyPrompt(key))) ? "Copied" : "Copy failed";
-    setTimeout(() => (link.textContent = "copy groom prompt"), 1500);
+    text.textContent = (await copyToClipboard(() => api.copyPrompt(key))) ? "Copied" : "Copy failed";
+    setTimeout(() => (text.textContent = "copy groom prompt"), 1500);
   });
   return link;
 }

@@ -1,4 +1,5 @@
 import type { Row } from "../shared/types.ts";
+import { icon } from "./icons.ts";
 import { api, type CopyKind, type TicketResponse } from "./api.ts";
 import { copyToClipboard, h, setHtml } from "./dom.ts";
 import { editNote, isEditing } from "./editors.ts";
@@ -161,12 +162,14 @@ function toast(text: string): void {
   toastTimer = setTimeout(() => el.remove(), 1500);
 }
 
-function copyButton(key: string, kind: CopyKind, label: string): HTMLElement {
+function copyButton(key: string, kind: CopyKind, label: string, title: string, forClaude = false): HTMLElement {
   return h("button", {
     type: "button",
-    class: "btn",
+    class: "btn btn-icon",
+    title,
+    "aria-label": title,
     onclick: async () => toast((await copyToClipboard(() => api.copy(key, kind))) ? "Copied" : "Copy failed"),
-  }, label);
+  }, icon("square2Stack", "btn-svg"), forClaude ? icon("claude", "btn-svg brand-claude") : null, label);
 }
 
 function rowFor(key: string): Row | null {
@@ -252,7 +255,7 @@ function groomSection(row: Row | null): HTMLElement {
         htmlBox(payload.groomHtml, ""),
       );
     } else {
-      box.append(h("span", { class: "text-muted" }, "No groom output yet. Use Copy groom prompt, then run it in Claude."), h("code", { class: "dr-path" }, payload.groomPath));
+      box.append(h("span", { class: "text-muted" }, "No groom output yet. Use the Groom prompt button, then run it in Claude."), h("code", { class: "dr-path" }, payload.groomPath));
     }
   } else if (row?.groom) {
     box.append(h("div", { class: "dr-prose dr-plain" }, row.groom.summary));
@@ -281,11 +284,11 @@ function render(): void {
       h("button", { type: "button", class: "btn", "aria-label": "Close", onclick: closeDrawer }, "×"),
     ),
     h("div", { class: "dr-actions" },
-      copyButton(key, "ticket", "Copy ticket"),
-      copyButton(key, "notes", "Copy notes"),
-      copyButton(key, "both", "Copy both for Claude"),
-      copyButton(key, "prompt", "Copy groom prompt"),
-      t ? h("a", { class: "btn", href: t.url, target: "_blank", rel: "noopener" }, "Open in Jira ↗") : null,
+      copyButton(key, "ticket", "Ticket", "Copy ticket as markdown"),
+      copyButton(key, "notes", "Notes", "Copy my notes"),
+      copyButton(key, "both", "Ticket + notes", "Copy ticket, notes and groom output for Claude", true),
+      copyButton(key, "prompt", "Groom prompt", "Copy the groom prompt for Claude", true),
+      t ? h("a", { class: "btn btn-icon", href: t.url, target: "_blank", rel: "noopener", title: "Open in Jira" }, icon("jira", "btn-svg brand-jira"), "Open", icon("arrowTopRightOnSquare", "btn-svg")) : null,
     ),
   );
 

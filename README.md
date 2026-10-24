@@ -58,8 +58,8 @@ custom:
 
 Optional keys:
 
-- `jiraFields.acceptanceCriteria`: the `customfield_NNNNN` holding acceptance criteria, if your site has one. It is shown in the ticket drawer and included in "Copy ticket".
-- `groomPrompt`: the text the "Copy groom prompt" button copies. Placeholders `{key}`, `{url}` and `{groomPath}` are filled in per ticket. The default asks for a skill called `groom-work-item` (the author's own); change it to name your own grooming skill or prompt.
+- `jiraFields.acceptanceCriteria`: the `customfield_NNNNN` holding acceptance criteria, if your site has one. It is shown in the ticket drawer and included when you copy the ticket.
+- `groomPrompt`: the text the "Groom prompt" copy button copies. Placeholders `{key}`, `{url}` and `{groomPath}` are filled in per ticket. The default asks for a skill called `groom-work-item` (the author's own); change it to name your own grooming skill or prompt.
 
 Finding your field ids: open `https://<your-site>/rest/api/3/field` in a browser while logged in to Jira and search for "Story point estimate" and "Sprint". The `id` is the `customfield_NNNNN` value. Custom column values are stored in each note's front matter. Option lists are only edited in this file, but you filter on them from the UI.
 
