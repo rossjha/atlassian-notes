@@ -163,7 +163,7 @@ body {
 
   .tab-wrap { display: inline-flex; align-items: center; border-bottom: 2px solid transparent; }
   .tab-wrap.active { border-bottom-color: var(--accent); }
-  .tab-wrap .tab, .tab-wrap .tab.active { border-bottom: 0; padding-right: 0.3rem; }
+  .tab-wrap .tab, .tab-wrap .tab.active { border-bottom: 0; }
   .icon-btn[aria-expanded="true"] { color: var(--accent); }
   .menu { position: absolute; z-index: 40; min-width: 10rem; padding: 0.25rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow); display: flex; flex-direction: column; }
   .menu-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: var(--r-sm); text-align: left; color: var(--fg); cursor: pointer; font-size: 13px; }
