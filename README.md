@@ -113,6 +113,10 @@ To wire up your own Claude skill (for example `groom-work-item`), add this line 
 
 > Save your output to `$NOTES_DIR/jira/groom/<KEY>.md` (default `~/atlassian-notes-data`) with front matter `readiness`, `summary` and `groomed_at` (ISO timestamp), followed by the full write-up.
 
+## Themes
+
+The app uses the Carbon theme by default (near-black, one yellow accent, square edges, JetBrains Mono, bundled locally). Pick another of the ten themes, such as Tokyo Night, Catppuccin, Gruvbox or Nord, from the swatch button in the tab bar. Your choice is stored in this browser only. The themes are copied from the author's forge project.
+
 ## Sharing
 
 `npm run pack` writes `atlassian-notes.zip` next to the app folder. It contains one top-level `atlassian-notes/` folder with only code, examples and this README: no token, env files, notes, cache or `node_modules`. Send that. Recipients unzip it, `cd atlassian-notes`, then follow Install above.

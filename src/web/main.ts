@@ -1,6 +1,6 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { icon, refreshButton } from "./icons.ts";
-import { confirmDialog, viewSettingsButton } from "./viewMenu.ts";
+import { confirmDialog, themePickerButton, viewSettingsButton } from "./viewMenu.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
@@ -12,6 +12,10 @@ import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
+import { applySavedTheme } from "./themes.ts";
+
+// Before the first render, so a saved theme never flashes the default one.
+applySavedTheme();
 
 const TAB_KEY = "atlassian-notes.activeTab";
 /** Special tab id; never a view id (view ids can't contain "_"). */
@@ -77,7 +81,7 @@ searchForm.addEventListener("submit", (e) => {
   searchHint.hidden = true;
   openDrawer(key, { fromSearch: true });
 });
-const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm);
+const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm, themePickerButton());
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
 errorEl.hidden = true; // shown by renderChrome only when there is an error; avoids an empty red bar on load

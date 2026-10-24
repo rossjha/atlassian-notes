@@ -1,5 +1,6 @@
 import { h } from "./dom.ts";
 import { icon } from "./icons.ts";
+import { currentTheme, saveTheme, THEMES } from "./themes.ts";
 
 export interface ViewMenuActions {
   onEdit(): void;
@@ -30,6 +31,55 @@ document.addEventListener("keydown", (e) => {
 });
 window.addEventListener("resize", () => closeMenu());
 
+/** Opens `el` as the menu for `anchor`, right-aligned under it (both anchors sit at the far right of their bar). */
+function showMenu(anchor: HTMLElement, el: HTMLElement, focus = ".menu-item:not([disabled])"): void {
+  document.body.append(el);
+  const r = anchor.getBoundingClientRect();
+  el.style.setProperty("top", `${r.bottom + window.scrollY + 4}px`);
+  el.style.setProperty("left", `${Math.max(8, r.right + window.scrollX - el.offsetWidth)}px`);
+  anchor.setAttribute("aria-expanded", "true");
+  openMenu = { el, anchor };
+  el.querySelector<HTMLElement>(focus)?.focus();
+}
+
+/** The swatch button in the tab bar, opening a menu of the ten themes. */
+export function themePickerButton(): HTMLElement {
+  const btn = h("button", {
+    type: "button",
+    class: "icon-btn",
+    title: "Theme",
+    "aria-label": "Choose theme",
+    "aria-haspopup": "menu",
+    "aria-expanded": "false",
+  }, icon("swatch", "icon-btn-svg"));
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (openMenu?.anchor === btn) return closeMenu();
+    closeMenu();
+    const current = currentTheme();
+    const items = THEMES.map((t) => {
+      const chips = t.swatch.map((c) => {
+        const chip = h("span", { class: "theme-chip" });
+        chip.style.setProperty("--chip", c);
+        return chip;
+      });
+      const on = t.id === current;
+      return h("button", {
+        type: "button",
+        role: "menuitemradio",
+        "aria-checked": String(on),
+        class: `menu-item theme-item${on ? " theme-current" : ""}`,
+        onclick: () => {
+          saveTheme(t.id);
+          closeMenu(true);
+        },
+      }, h("span", { class: "theme-swatch", "aria-hidden": "true" }, ...chips), h("span", { class: "theme-name" }, t.name), h("span", { class: "theme-check", "aria-hidden": "true" }, on ? "✓" : ""));
+    });
+    showMenu(btn, h("div", { class: "menu theme-menu", role: "menu", "aria-label": "Theme" }, ...items), ".theme-current");
+  });
+  return btn;
+}
+
 /** The settings cog in the view header, opening a small Edit / Delete menu for the active view. */
 export function viewSettingsButton(viewName: string, actions: ViewMenuActions): HTMLElement {
   const btn = h("button", {
@@ -51,18 +101,10 @@ export function viewSettingsButton(viewName: string, actions: ViewMenuActions): 
       del.setAttribute("disabled", "");
       del.setAttribute("title", actions.deleteDisabledReason);
     }
-    const el = h("div", { class: "menu", role: "menu", "aria-label": `Options for view ${viewName}` },
+    showMenu(btn, h("div", { class: "menu", role: "menu", "aria-label": `Options for view ${viewName}` },
       item(icon("pencilSquare", "menu-svg"), "Edit view", actions.onEdit),
       del,
-    );
-    document.body.append(el);
-    const r = btn.getBoundingClientRect();
-    el.style.setProperty("top", `${r.bottom + window.scrollY + 4}px`);
-    // Right-align under the cog, which sits at the far right of the header.
-    el.style.setProperty("left", `${Math.max(8, r.right + window.scrollX - el.offsetWidth)}px`);
-    btn.setAttribute("aria-expanded", "true");
-    openMenu = { el, anchor: btn };
-    el.querySelector<HTMLElement>(".menu-item:not([disabled])")?.focus();
+    ));
   });
   return btn;
 }
