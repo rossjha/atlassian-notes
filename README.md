@@ -40,7 +40,7 @@ On first run, `views.yaml` and `columns.yaml` are created from `examples/` with 
 
 ## views.yaml and columns.yaml
 
-`views.yaml`: each view has an `id`, `name`, `jql`, ordered `columns` (each `id`, optionally `display: truncate`) and optionally `limit` (default 500). See `examples/views.example.yaml`. Built-in column ids: `key`, `summary`, `status`, `type`, `priority`, `assignee`, `reporter`, `storyPoints`, `parent`, `labels`, `sprint`, `updated`, plus `note` and `groom`, and the sortable timestamps `noteUpdated` ("Note updated") and `groomed` ("Groomed").
+`views.yaml`: each view has an `id`, `name`, `jql`, ordered `columns` (each `id`, optionally `display: truncate`) and optionally `limit` (default 500). See `examples/views.example.yaml`. Built-in column ids: `key`, `summary`, `status`, `type`, `priority`, `assignee`, `reporter`, `storyPoints`, `parent`, `labels`, `sprint`, `updated`, plus `note` and `groom`, and the sortable timestamps `noteUpdated` ("Note updated") and `groomed` ("Groomed"). These built-in ids (including `noteUpdated` and `groomed`) are reserved: a custom column in `columns.yaml` can't use any of them, and `columns.yaml` is reported as broken if one does.
 
 `columns.yaml`: see `examples/columns.example.yaml`.
 
