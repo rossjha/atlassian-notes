@@ -27,7 +27,7 @@ body {
   .ticket-search-input { width: 9rem; padding: 0.2rem 0.5rem; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text); }
   .ticket-search-input:focus { outline: none; border-color: var(--accent); }
   .ticket-search-hint { font-size: 11px; color: #fca5a5; white-space: nowrap; }
-  .dr-star { flex: none; font-size: 18px; }
+  .star-btn.dr-star { flex: none; font-size: 18px; }
   .tab { padding: 0.4rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; background: none; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--text); border-bottom-color: var(--accent); }
