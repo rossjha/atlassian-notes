@@ -85,7 +85,7 @@ export function drawerOnLive(key: string): void {
 }
 
 function starTitle(star: NonNullable<DrawerHooks["star"]>, on: boolean): string {
-  return star.disabled ? (star.locked ? "board.yaml has an error" : "Board unavailable") : on ? "Remove from my board" : "Add to my board";
+  return star.disabled ? (star.locked ? "board.yaml has an error" : "Board unavailable") : on ? "Remove from Kanban" : "Add to Kanban";
 }
 
 function starButton(key: string): HTMLElement | null {

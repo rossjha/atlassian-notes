@@ -24,8 +24,11 @@ body {
   .tabs { display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--line); }
   .tabs-list { display: flex; gap: 0.25rem; flex: 1; min-width: 0; flex-wrap: wrap; }
   .ticket-search { display: flex; align-items: center; gap: 0.5rem; flex: none; }
-  .ticket-search-input { width: 9rem; padding: 0.2rem 0.5rem; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text); }
+  .ticket-search-field { position: relative; display: flex; align-items: center; }
+  .ticket-search-icon { position: absolute; left: 0.45rem; width: 14px; height: 14px; color: var(--muted); pointer-events: none; }
+  .ticket-search-input { width: 10rem; padding: 0.2rem 0.5rem 0.2rem 1.6rem; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text); }
   .ticket-search-input:focus { outline: none; border-color: var(--accent); }
+  .tabs-divider { align-self: center; color: var(--line); padding: 0 0.25rem; user-select: none; }
   .ticket-search-hint { font-size: 11px; color: #fca5a5; white-space: nowrap; }
   .star-btn.dr-star { flex: none; font-size: 18px; }
   .tab { padding: 0.4rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; background: none; }

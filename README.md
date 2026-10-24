@@ -63,9 +63,9 @@ Optional keys:
 
 Finding your field ids: open `https://<your-site>/rest/api/3/field` in a browser while logged in to Jira and search for "Story point estimate" and "Sprint". The `id` is the `customfield_NNNNN` value. Custom column values are stored in each note's front matter. Option lists are only edited in this file, but you filter on them from the UI.
 
-## My board
+## Kanban
 
-The **★ My board** tab is a personal kanban for tickets you want to come back to, whatever view or search they came from. Moving a card never touches Jira.
+The **Kanban** tab (far left) is a personal board for tickets you want to come back to, whatever view or search they came from. Moving a card never touches Jira.
 
 - **Starring:** click the ☆ in the first column of any table view to put a ticket at the bottom of the first column. Click the ★ again to take it off. The ✕ on a card (shown on hover or focus) does the same.
 - **Moving cards:** drag a card to another column or to a new place in its column; a blue bar shows where it will land. With a card focused (Tab to it), Alt+←/→ moves it to the previous or next column and Alt+↑/↓ moves it up or down one place. Enter opens the ticket.

@@ -52,8 +52,8 @@ function cardEl(
   const remove = h("button", {
     type: "button",
     class: "card-x",
-    title: "Take off my board",
-    "aria-label": `Remove ${card.key} from my board`,
+    title: "Remove from Kanban",
+    "aria-label": `Remove ${card.key} from Kanban`,
     onclick: () => handlers.onOp({ op: "remove", key: card.key }),
   }, "✕");
   if (disabled) remove.setAttribute("disabled", "");

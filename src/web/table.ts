@@ -29,7 +29,7 @@ function starCell(key: string, star: NonNullable<TableHandlers["star"]>): HTMLEl
     class: `star-btn${on ? " on" : ""}`,
     "aria-pressed": String(on),
     "aria-label": `Star ${key}`,
-    title: star.disabled ? (star.locked ? "board.yaml has an error" : "Board unavailable") : on ? "Remove from my board" : "Add to my board",
+    title: star.disabled ? (star.locked ? "board.yaml has an error" : "Board unavailable") : on ? "Remove from Kanban" : "Add to Kanban",
     onclick: (e: Event) => {
       e.stopPropagation();
       star.toggle(key);
@@ -50,7 +50,7 @@ export function renderTable(
   const visible: ColumnSetting[] = view.columns.filter((c) => !c.hidden);
   const star = handlers.star;
   const head = h("tr", {},
-    star ? h("th", { class: "col-star", "aria-label": "My board" }, "★") : null,
+    star ? h("th", { class: "col-star", "aria-label": "On Kanban" }, "★") : null,
     ...visible.map((c) => {
       const active = sort?.columnId === c.id;
       return h("th", { class: `col-${c.id}${active ? " sorted" : ""}`, "aria-sort": active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none" },

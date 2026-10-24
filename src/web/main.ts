@@ -1,4 +1,5 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
+import { icon } from "./icons.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
@@ -52,7 +53,7 @@ const searchInput = h("input", {
   autocomplete: "off",
   spellcheck: "false",
 }) as HTMLInputElement;
-const searchForm = h("form", { class: "ticket-search" }, searchInput, searchHint);
+const searchForm = h("form", { class: "ticket-search" }, h("label", { class: "ticket-search-field" }, icon("magnifyingGlass", "ticket-search-icon"), searchInput), searchHint);
 searchInput.addEventListener("input", () => {
   searchHint.hidden = true;
 });
@@ -308,7 +309,12 @@ function selectTab(id: string): void {
 function renderChrome(): void {
   const locked = viewsLocked();
   const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
+  const onBoard = activeId === BOARD_TAB;
   tabsListEl.replaceChildren(
+    h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
+      h("button", { type: "button", class: `tab${onBoard ? " active" : ""}`, onclick: () => selectTab(BOARD_TAB) }, "Kanban"),
+    ),
+    h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
@@ -317,12 +323,6 @@ function renderChrome(): void {
     ),
   );
   if (!locked) tabsListEl.append(h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"));
-  const onBoard = activeId === BOARD_TAB;
-  tabsListEl.append(
-    h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
-      h("button", { type: "button", class: `tab${onBoard ? " active" : ""}`, onclick: () => selectTab(BOARD_TAB) }, "★ My board"),
-    ),
-  );
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {
