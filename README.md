@@ -78,7 +78,7 @@ To wire up your own Claude skill (for example `groom-work-item`), add this line 
 
 ## Sharing
 
-`npm run pack` writes `atlassian-notes.zip` next to the app folder, containing only code, examples and this README. No token, notes, cache or `node_modules`. Send that. Recipients unzip, then follow Install above.
+`npm run pack` writes `atlassian-notes.zip` next to the app folder. It contains one top-level `atlassian-notes/` folder with only code, examples and this README: no token, env files, notes, cache or `node_modules`. Send that. Recipients unzip it, `cd atlassian-notes`, then follow Install above.
 
 ## Privacy
 

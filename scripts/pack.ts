@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const PACK_INCLUDE: string[] = [
@@ -16,6 +17,33 @@ export const PACK_INCLUDE: string[] = [
   "public/index.html",
 ];
 
+export function isExcluded(name: string): boolean {
+  return name === ".DS_Store" || (name.startsWith(".env") && name !== ".env.example");
+}
+
+/** Stages PACK_INCLUDE (no symlinks, no env files) under <tmp>/atlassian-notes and zips that folder. */
+export function buildZip(root: string, out: string): void {
+  const stage = mkdtempSync(join(tmpdir(), "atlassian-notes-pack-"));
+  try {
+    const dest = join(stage, "atlassian-notes");
+    for (const entry of PACK_INCLUDE) {
+      mkdirSync(dirname(join(dest, entry)), { recursive: true });
+      cpSync(join(root, entry), join(dest, entry), {
+        recursive: true,
+        filter: (src) => !isExcluded(basename(src)) && !lstatSync(src).isSymbolicLink(),
+      });
+    }
+    rmSync(out, { force: true });
+    const res = spawnSync("zip", ["-r", "-q", "-y", out, "atlassian-notes", "-x", "*.DS_Store"], {
+      cwd: stage,
+      stdio: "inherit",
+    });
+    if (res.status !== 0) throw new Error("zip failed.");
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+  }
+}
+
 function main(): void {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const out = join(dirname(root), "atlassian-notes.zip");
@@ -25,19 +53,15 @@ function main(): void {
     console.error(`Cannot pack, missing: ${missing.join(", ")}`);
     process.exit(1);
   }
-  const probe = spawnSync("zip", ["-v"], { stdio: "ignore" });
-  if (probe.error) {
+  if (spawnSync("zip", ["-v"], { stdio: "ignore" }).error) {
     console.error("The `zip` command was not found. Install it (macOS and most Linux distros ship it) and try again.");
     process.exit(1);
   }
-  rmSync(out, { force: true });
-  const res = spawnSync("zip", ["-r", "-q", out, ...PACK_INCLUDE, "-x", "*.DS_Store"], {
-    cwd: root,
-    stdio: "inherit",
-  });
-  if (res.status !== 0) {
-    console.error("zip failed.");
-    process.exit(res.status ?? 1);
+  try {
+    buildZip(root, out);
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(1);
   }
   console.log(out);
 }
