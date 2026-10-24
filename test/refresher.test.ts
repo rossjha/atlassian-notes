@@ -115,3 +115,41 @@ test("start ticks on an interval and stop halts it", async () => {
   await new Promise((res) => setTimeout(res, 100));
   assert.equal(calls, after);
 });
+
+test("runAll refreshes the board after views, counts board tickets as seen, and renames via board", async () => {
+  const order: string[] = [];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-board-"));
+  const notes = new NotesStore(dir);
+  await notes.writeNoteBody("BOARD-1", "x", { baseMtimeMs: null, jiraId: "500" });
+  await notes.writeNoteBody("OLD-1", "x", { baseMtimeMs: null, jiraId: "600" });
+  const renames: [string, string][] = [];
+  const board = {
+    refresh: async () => { order.push("board"); },
+    tickets: async () => new Map([["BOARD-1", t("500", "BOARD-1")], ["NEW-1", t("600", "NEW-1")]]),
+    rename: async (o: string, n: string) => { renames.push([o, n]); },
+  };
+  const r = new Refresher({
+    jira: { search: async () => { order.push("view"); return []; }, getIssueBrief: async () => null, getIssueDetail: async () => { throw new Error("x"); } } as unknown as JiraClient,
+    cache: new ViewCache(dir), notes, getViews: async () => [view], onChange: () => {},
+    statePath: path.join(dir, ".cache", "reconcile.json"), board,
+  });
+  await r.refreshAll();
+  assert.deepEqual(order, ["view", "board"]);
+  assert.deepEqual(r.orphans(), []);
+  assert.deepEqual(renames, [["OLD-1", "NEW-1"]]);
+});
+
+test("a throwing board refresh is logged and does not abort the cycle", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-board-"));
+  const board = { refresh: async () => { throw new Error("bd"); }, tickets: async () => new Map<string, Ticket>(), rename: async () => {} };
+  const r = new Refresher({
+    jira: { search: async () => [], getIssueBrief: async () => null } as unknown as JiraClient,
+    cache: new ViewCache(dir), notes: new NotesStore(dir), getViews: async () => [view], onChange: () => {},
+    statePath: path.join(dir, ".cache", "reconcile.json"), board,
+  });
+  const orig = console.error;
+  const logged: unknown[][] = [];
+  console.error = (...a: unknown[]) => { logged.push(a); };
+  try { await r.refreshAll(); } finally { console.error = orig; }
+  assert.equal(logged.length, 1);
+});

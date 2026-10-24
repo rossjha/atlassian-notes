@@ -121,3 +121,18 @@ export type LiveEvent =
   | { type: "views" | "columns" }
   | { type: "orphans" }
   | { type: "board" };
+
+export interface BoardCard {
+  key: string;
+  row: Row | null;
+  missing: boolean;
+}
+
+export interface BoardResponse {
+  columns: string[];
+  archiveColumn: string;
+  cards: Record<string, BoardCard[]>;
+  fetchedAt: string | null;
+  error: string | null;
+  locked: boolean;
+}

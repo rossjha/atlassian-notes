@@ -12,6 +12,11 @@ export interface RefresherDeps {
   onChange: (e: LiveEvent) => void;
   statePath: string;
   now?: () => Date;
+  board?: {
+    refresh(): Promise<void>;
+    tickets(): Promise<Map<string, Ticket>>;
+    rename(oldKey: string, newKey: string): Promise<void>;
+  };
 }
 
 export class Refresher {
@@ -66,7 +71,7 @@ export class Refresher {
   }
 
   private async runAll(): Promise<void> {
-    const { jira, cache, notes, getViews, onChange, statePath } = this.deps;
+    const { jira, cache, notes, getViews, onChange, statePath, board } = this.deps;
     const views = await getViews();
     for (const v of views) {
       try {
@@ -75,9 +80,24 @@ export class Refresher {
         console.error(`refresh of view ${v.id} failed:`, e instanceof Error ? e.message : e);
       }
     }
+    if (board) {
+      try {
+        await board.refresh();
+      } catch (e) {
+        console.error("refresh of board failed:", e instanceof Error ? e.message : e);
+      }
+    }
     const seen = await cache.allTickets(views.map((v) => v.id));
+    if (board) for (const [k, tk] of await board.tickets()) seen.set(k, tk);
     const { renamed, orphans } = await reconcile({ jira, notes, seen, statePath, now: this.now() });
-    for (const [, newKey] of renamed) {
+    for (const [oldKey, newKey] of renamed) {
+      if (board) {
+        try {
+          await board.rename(oldKey, newKey);
+        } catch (e) {
+          console.error(`board rename ${oldKey} -> ${newKey} failed:`, e instanceof Error ? e.message : e);
+        }
+      }
       onChange({ type: "note", key: newKey });
       onChange({ type: "groom", key: newKey });
     }
