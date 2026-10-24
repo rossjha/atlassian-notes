@@ -42,7 +42,7 @@ export function renderTable(
       h("tr", {}, ...visible.map((c) => h("td", { class: `col-${c.id}` }, renderCell(row, c, columns)))),
     ),
   );
-  const table = h("table", { class: "grid" }, h("thead", {}, head), body);
+  const table = h("table", { class: "ticket-grid" }, h("thead", {}, head), body);
   table.addEventListener("click", (e) => {
     const a = (e.target as Element).closest("a[data-open]");
     if (!a) return;

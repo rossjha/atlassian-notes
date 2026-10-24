@@ -14,7 +14,8 @@ let activeId: string | null = null;
 let rows: Row[] = [];
 let fetchedAt: string | null = null;
 let rowsError: string | null = null;
-let refreshing = false;
+const refreshingIds = new Set<string>();
+let rowsSeq = 0;
 let sort: SortState | null = null;
 
 const root = document.body;
@@ -25,7 +26,11 @@ const tableEl = h("div", { class: "table-wrap" });
 root.append(h("main", { class: "app" }, tabsEl, headerEl, errorEl, tableEl));
 
 const handlers: TableHandlers = {
-  onOpen: () => {}, // drawer arrives in a later task
+  onOpen(key) {
+    // Placeholder until the drawer (Task 12): open the Jira page.
+    const url = rows.find((r) => r.ticket.key === key)?.ticket.url;
+    if (url) window.open(url, "_blank", "noopener");
+  },
   onSort(columnId) {
     sort = sort?.columnId === columnId
       ? { columnId, dir: sort.dir === "asc" ? "desc" : "asc" }
@@ -76,11 +81,12 @@ function renderChrome(): void {
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {
-    const refresh = h("button", { type: "button", class: "btn", onclick: () => void doRefresh() }, refreshing ? "Refreshing…" : "Refresh");
-    if (refreshing) refresh.setAttribute("disabled", "");
+    const busy = refreshingIds.has(view.id);
+    const refresh = h("button", { type: "button", class: "btn", onclick: () => void doRefresh() }, busy ? "Refreshing…" : "Refresh");
+    if (busy) refresh.setAttribute("disabled", "");
     headerEl.append(
       h("code", { class: "jql" }, view.jql),
-      h("span", { class: "text-muted" }, `Last refreshed ${relativeTime(fetchedAt)}`),
+      h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(fetchedAt)}`),
       refresh,
     );
   }
@@ -121,12 +127,13 @@ async function loadConfig(): Promise<void> {
 async function loadRows(): Promise<void> {
   const id = activeId;
   if (!id) return;
+  const seq = ++rowsSeq;
   try {
     const r = await api.rows(id);
-    if (id !== activeId) return;
+    if (id !== activeId || seq !== rowsSeq) return;
     applyRows(r.rows, r.fetchedAt, r.error);
   } catch (e) {
-    if (id === activeId) {
+    if (id === activeId && seq === rowsSeq) {
       rowsError = (e as Error).message;
       renderChrome();
     }
@@ -143,16 +150,19 @@ function applyRows(r: Row[], at: string | null, err: string | null): void {
 
 async function doRefresh(): Promise<void> {
   const id = activeId;
-  if (!id || refreshing) return;
-  refreshing = true;
+  if (!id || refreshingIds.has(id)) return;
+  refreshingIds.add(id);
   renderChrome();
   try {
     const r = await api.refresh(id);
-    if (id === activeId) applyRows(r.rows, r.fetchedAt, r.error);
+    if (id === activeId) {
+      rowsSeq++; // supersede any in-flight rows fetch
+      applyRows(r.rows, r.fetchedAt, r.error);
+    }
   } catch (e) {
     if (id === activeId) rowsError = (e as Error).message;
   } finally {
-    refreshing = false;
+    refreshingIds.delete(id);
     renderChrome();
   }
 }
@@ -175,6 +185,9 @@ function onLive(e: LiveEvent): void {
   }
 }
 
-setInterval(renderChrome, 30_000); // keep "last refreshed" fresh
+setInterval(() => {
+  const el = headerEl.querySelector(".last-refreshed");
+  if (el) el.textContent = `Last refreshed ${relativeTime(fetchedAt)}`;
+}, 30_000); // keep "last refreshed" fresh
 connectLive(onLive);
 void loadConfig();

@@ -42,8 +42,8 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
     case "updated":
       return h("span", { class: "text-muted", title: t.updated }, relativeTime(t.updated));
     case "note": {
-      const box = h("div", { class: `note-box ${setting.display === "expand" ? "expand" : "truncate"}` }, row.note ? row.note.body : null);
-      if (!row.note) box.classList.add("empty");
+      const box = h("div", { class: `note-box ${setting.display === "expand" ? "cell-wrap" : "cell-clip"}` }, row.note ? row.note.body : null);
+      if (!row.note) box.classList.add("note-empty");
       const wrap = h("div", { class: "cell-flex" }, box);
       if (row.flags.jiraNewerThanNote) wrap.append(dot("Jira changed after this note was last edited"));
       return wrap;
@@ -60,7 +60,7 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
           g.readiness ? h("span", { class: "pill groom-readiness" }, g.readiness) : null,
           g.groomedAt ? h("span", { class: "text-muted", title: g.groomedAt }, relativeTime(g.groomedAt)) : null,
         ),
-        h("div", { class: setting.display === "expand" ? "expand" : "truncate" }, g.summary),
+        h("div", { class: setting.display === "expand" ? "cell-wrap" : "cell-clip" }, g.summary),
       );
       wrap.append(box);
       if (row.flags.jiraNewerThanGroom) wrap.append(dot("Jira changed after this groom was written"));

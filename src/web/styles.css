@@ -36,12 +36,12 @@ body {
   .empty-state { color: var(--muted); padding: 1rem; }
 
   .table-wrap { overflow-x: auto; }
-  .grid { width: 100%; border-collapse: collapse; table-layout: auto; }
-  .grid th { text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--line); padding: 0; white-space: nowrap; }
+  .ticket-grid { width: 100%; border-collapse: collapse; table-layout: auto; }
+  .ticket-grid th { text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--line); padding: 0; white-space: nowrap; }
   .th-btn { padding: 0.35rem 0.5rem; width: 100%; text-align: left; text-transform: inherit; letter-spacing: inherit; font: inherit; color: inherit; cursor: pointer; background: none; }
   .th-btn:hover, th.sorted .th-btn { color: var(--text); }
-  .grid td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .grid tbody tr:hover { background: rgba(148, 163, 184, 0.06); }
+  .ticket-grid td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .ticket-grid tbody tr:hover { background: rgba(148, 163, 184, 0.06); }
   .col-summary { min-width: 18rem; }
   .col-note, .col-groom { min-width: 16rem; max-width: 26rem; }
   .num { font-variant-numeric: tabular-nums; }
@@ -56,12 +56,12 @@ body {
 
   .cell-flex { display: flex; align-items: flex-start; gap: 0.4rem; }
   .note-box { flex: 1; min-width: 0; border: 1px dashed #475569; border-radius: 4px; padding: 0.15rem 0.4rem; min-height: 1.6em; color: #cbd5e1; }
-  .note-box.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .note-box.expand, .expand { white-space: pre-wrap; }
+  .note-box.cell-clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .note-box.cell-wrap, .cell-wrap { white-space: pre-wrap; }
   .groom-box { flex: 1; min-width: 0; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(96, 165, 250, 0.35); border-radius: 4px; padding: 0.15rem 0.4rem; }
   .groom-head { display: flex; gap: 0.5rem; align-items: center; font-size: 11px; }
   .groom-readiness { color: #93c5fd; border-color: rgba(96, 165, 250, 0.5); background: transparent; }
-  .groom-box .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .groom-box .cell-clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stale-dot { flex: none; width: 8px; height: 8px; margin-top: 0.4rem; border-radius: 50%; background: #f97316; }
   .link-btn { color: var(--accent); background: none; font-size: 12px; cursor: pointer; text-decoration: underline dotted; }
 }
