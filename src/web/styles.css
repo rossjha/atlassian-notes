@@ -114,7 +114,8 @@ body {
   /* The bar and its editor share one box model, in whole pixels: 18px line + 2×2px padding + 2×1px border = 24px.
      The header centres its items, so any height difference (e.g. 24.8px vs a rounded scrollHeight) moved the text. */
   .jql-btn, .jql-edit { display: block; box-sizing: border-box; height: 24px; margin: 0; padding: 2px 8px; border-width: 1px; font: 400 12px/18px var(--font); letter-spacing: normal; vertical-align: top; appearance: none; -webkit-appearance: none; }
-  .jql-btn { text-align: left; cursor: text; }
+  /* At rest the JQL reads slightly muted (clearly not a placeholder); full text colour on hover and while editing. */
+  .jql-btn { text-align: left; cursor: text; color: color-mix(in srgb, var(--fg) 72%, var(--muted)); }
   .jql-btn:hover { border-color: var(--dim); color: var(--fg); }
   .jql-edit { white-space: pre-wrap; overflow: hidden; resize: none; outline: none; border-color: var(--accent); color: var(--fg); }
   .error-bar { background: color-mix(in srgb, var(--danger) 12%, var(--bg)); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent); border-radius: var(--r-sm); padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; white-space: pre-wrap; }
