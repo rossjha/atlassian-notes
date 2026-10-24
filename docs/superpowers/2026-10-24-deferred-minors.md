@@ -1,0 +1,61 @@
+# Deferred minor findings (v1)
+
+Collected from per-task reviews; the final whole-branch review triaged these as fine to defer. Items fixed in the final fix wave are omitted.
+
+- Task 1: minor (deferred): invalid PORT/REFRESH_MINUTES silently fall back to defaults; PORT not capped at 65535
+- Task 1: minor (deferred): non-ENOENT env read errors rethrown raw without the path
+- Task 1: minor (deferred): parseEnvFile ignores `export KEY=` and inline # comments
+- Task 1: minor (deferred): no tests for env-only ENOENT fallback / invalid PORT
+- Task 1: minor (deferred): @types/node ^26 vs engines >=22.18
+- Task 2: minor (deferred): renameKey check+rename not atomic; partial move if groom move fails
+- Task 2: minor (deferred): listAll fails entirely on one unreadable entry (e.g. dir named PAY-1.md)
+- Task 2: minor (deferred): BOM / unclosed --- → second front-matter block prepended on field write
+- Task 2: minor (deferred): groom summary is "---" when front matter is broken
+- Task 2: minor (deferred): YAML comments in front matter lost on rewrite (inherent)
+- Task 2: minor (deferred): test gaps — force on parse-error, groom-only target-exists, long folded summary round-trip
+- Task 3: minor (deferred): ensureDataDir check-then-atomicWrite could clobber a file created in between (use wx)
+- Task 3: minor (deferred): projectKey substituted into YAML unescaped/unvalidated
+- Task 3: minor (deferred): custom column ids have no format check
+- Task 4: minor (deferred): add regression tests for sanitizer bypass probes (entity/mixed-case schemes, autolink, reference links, quotes in href/title, HTML in code span) — reviewer probed, all currently safe
+- Task 4: minor (deferred): adfToMarkdown doesn't escape link hrefs/text (`)`, `]`, spaces)
+- Task 4: minor (deferred): ordered-list nesting uses 2-space indent (plan-mandated; CommonMark needs 3)
+- Task 4: minor (deferred): table cells don't escape `|`
+- Task 5: minor (deferred): tests missing for empty-page+token termination, mid-page truncation, limit>100 second-page maxResults
+- Task 5: minor (deferred): apiBase test should assert full pathname incl /rest/api/3/search/jql
+- Task 5: minor (deferred): idOrKey "." / ".." collapses via URL normalisation (blocked upstream by isValidKey)
+- Task 5: minor (deferred): token-not-in-error test is weak
+- Task 6: minor (deferred): row.custom plain-object lookup returns inherited props for ids like constructor (ids validated upstream)
+- Task 6: minor (deferred): groom cell "" instead of null when readiness null + summary empty (sort placement)
+- Task 6: minor (deferred): test gaps — buildRow groomedAt null, empty-labels cellValue
+- Task 7: minor (deferred): reconcile swallows non-JiraError from getIssueBrief without logging
+- Task 7: minor (deferred): atomicWrite throwing in reconcile finally masks original error / loses renamed list
+- Task 7: minor (deferred): test noise — `void r;`, unused setup in refresher.test.ts
+- Task 7: minor (deferred): note+groom with different jira_ids — note wins silently
+- Task 7: minor (deferred): reconcile test gaps — 404 orphan, transient keeps prior orphan, groom-only rename
+- Task 8: minor (deferred): missing security regression tests — no-Host, mixed-case Host, [::1] Host, json;charset acceptance, SSE client cleanup; static traversal tests mostly normalized by fetch (use raw requests)
+- Task 8: minor (deferred): main.ts swallows columns.yaml reload error silently (should console.error); app.ts jiraIdFor catches all errors
+- Task 8: minor (deferred): watcher stops permanently on error (needs restart)
+- Task 8: minor (deferred): default field mapping duplicated in app.ts and main.ts
+- Task 8: minor (deferred): cleanups — `1 + 1`, redundant `e === undefined`, HEAD on /api returns 404
+- Task 8: minor (deferred): app tests order-dependent shared state
+- Task 9: minor (deferred): selectTab flashes "No tickets." before load (no loading state)
+- Task 9: minor (deferred): EventSource gives up permanently on non-200 (no onerror recreate)
+- Task 9: minor (deferred): Tailwind emits inert utilities from stray words (bloat only)
+- Task 10: minor (deferred): failed select setField message lost on later blur; renders stay deferred while failed editor open
+- Task 10: minor (deferred): rerender triggers full loadRows on Esc/no-change closes
+- Task 10: minor (deferred): comment that whole-file saveViews may overwrite a just-made hand edit
+- Task 10: minor (deferred): no keyboard path to open editors
+- Task 11: minor (deferred): two errors joined with "\n" in error bar — needs white-space: pre-line
+- Task 11: minor (deferred): focusKey may linger while render deferred
+- Task 11: minor (deferred): unchecking last option jumps popover anchor
+- Task 11: minor (deferred): slugify collapses non-ASCII names ("Ünï" → "n") and a test pins it
+- Task 11: minor (deferred): no tests for N/M computation / filter-change reducer
+- Task 12: minor (deferred): "Changed on disk" notice shown after any fetch while editing, incl. failed fetch (error hidden)
+- Task 12: minor (deferred): full drawer re-render on live refetch moves focus to panel
+- Task 12: minor (deferred): no focus trap / aria-modal
+- Task 12: minor (deferred): loadOrphans failure swallowed silently
+- Task 12: minor (deferred): Esc-cancelled edit triggers unnecessary Jira refetch
+- Task 12: minor (deferred): redundant copyPrompt wrapper in api.ts
+- Task 12: minor (deferred): orphans UI in main.ts (file-plan deviation)
+- Task 13: minor (deferred): declining non-atlassian host prints same "Setup cancelled." as Ctrl-C (exit 1)
+- Task 13: minor (deferred): interactive setup main() (hidden token, Ctrl-C) not exercised by hand
