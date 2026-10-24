@@ -79,6 +79,8 @@ body {
   .link-svg { width: 12px; height: 12px; flex: none; }
   /* Brand marks keep their own colours in every theme. */
   .brand-claude, .brand-jira { color: var(--muted); }
+  .tab-kanban { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .tab-svg { width: 15px; height: 15px; flex: none; }
   .tabs-divider { align-self: center; color: var(--border); padding: 0 0.25rem; user-select: none; }
   .ticket-search-hint { font-size: 11px; color: var(--danger); white-space: nowrap; }
   .star-btn.dr-star { flex: none; font-size: 22px; }
