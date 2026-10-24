@@ -4,6 +4,7 @@ import { h } from "./dom.ts";
 /** Which popover is open: "add" (the column menu), a custom column id, or none. Survives re-renders. */
 let openPop: string | null = null;
 let rerender: (() => void) | null = null;
+let focusKey: string | null = null;
 
 document.addEventListener("click", (e) => {
   if (openPop === null) return;
@@ -34,7 +35,7 @@ export function renderFilterBar(
   container: HTMLElement,
   view: View,
   columns: ColumnsConfig,
-  totals: { shown: number; total: number },
+  totals: { shown: number; total: number; loaded?: boolean },
   onChange: (filters: Filters) => void,
 ): void {
   const draw = (): void => renderFilterBar(container, view, columns, totals, onChange);
@@ -55,7 +56,11 @@ export function renderFilterBar(
     const check = (label: string, checked: boolean, onToggle: (on: boolean) => void): HTMLElement => {
       const box = h("input", { type: "checkbox" }) as HTMLInputElement;
       box.checked = checked;
-      box.addEventListener("change", () => onToggle(box.checked));
+      box.setAttribute("data-fb-key", `${id}\u0000${label}`);
+      box.addEventListener("change", () => {
+        focusKey = `${id}\u0000${label}`;
+        onToggle(box.checked);
+      });
       return h("label", { class: "fb-opt" }, box, h("span", {}, label));
     };
     if (def.type === "select") {
@@ -124,12 +129,19 @@ export function renderFilterBar(
     openPop = null;
     onChange({});
   } }, "Clear filters");
-  clear.hidden = activeEntries.length === 0;
+  clear.hidden = Object.keys(view.filters).length === 0;
 
   container.replaceChildren(
     adder,
     ...chips,
     clear,
-    h("span", { class: "text-muted fb-count" }, `Showing ${totals.shown} of ${totals.total}`),
+    ...(totals.loaded === false ? [] : [h("span", { class: "text-muted fb-count" }, `Showing ${totals.shown} of ${totals.total}`)]),
   );
+  if (focusKey !== null) {
+    const key = focusKey;
+    focusKey = null;
+    for (const el of container.querySelectorAll<HTMLInputElement>("input[data-fb-key]")) {
+      if (el.getAttribute("data-fb-key") === key) el.focus();
+    }
+  }
 }

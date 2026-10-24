@@ -17,6 +17,8 @@ let activeId: string | null = null;
 let rows: Row[] = [];
 let fetchedAt: string | null = null;
 let rowsError: string | null = null;
+let saveError: string | null = null;
+let rowsLoaded = false;
 const refreshingIds = new Set<string>();
 let rowsSeq = 0;
 let sort: SortState | null = null;
@@ -52,10 +54,12 @@ const handlers: TableHandlers = {
     void api.saveViews(next).then(
       () => {
         views = next;
+        saveError = null;
+        renderChrome();
         renderBody();
       },
       (e: Error) => {
-        rowsError = e.message;
+        saveError = e.message;
         renderChrome();
       },
     );
@@ -89,21 +93,29 @@ function onFiltersChanged(filters: Filters): void {
   const previous = views;
   const next = views.map((v) => (v.id === view.id ? { ...v, filters } : v));
   views = next; // optimistic: the chips and counts update at once
-  rowsError = null;
-  renderChrome();
   renderBody();
-  api.saveViews(next).catch((e: Error) => {
-    if (views === next) views = previous;
-    rowsError = e.message;
-    renderChrome();
-    renderBody();
-  });
+  api.saveViews(next).then(
+    () => {
+      saveError = null;
+      renderChrome();
+    },
+    (e: Error) => {
+      if (views === next) views = previous;
+      saveError = e.message;
+      renderChrome();
+      renderBody();
+    },
+  );
 }
 
 async function saveEditedView(edited: View, isNew: boolean): Promise<void> {
   const id = isNew ? uniqueViewId(edited.name, views.map((v) => v.id)) : edited.id;
   const saved = { ...edited, id };
   const old = views.find((v) => v.id === id);
+  if (!isNew) {
+    if (!old) throw new Error("This view no longer exists (it was changed on disk). Close the dialog and reopen it.");
+    saved.filters = old.filters; // keep filters changed since the dialog opened
+  }
   const next = isNew ? [...views, saved] : views.map((v) => (v.id === id ? saved : v));
   await api.saveViews(next);
   views = next;
@@ -144,6 +156,7 @@ function selectTab(id: string): void {
   rows = [];
   fetchedAt = null;
   rowsError = null;
+  rowsLoaded = false;
   renderChrome();
   renderBody();
   void loadRows();
@@ -171,7 +184,7 @@ function renderChrome(): void {
       refresh,
     );
   }
-  const err = configError ?? rowsError;
+  const err = [configError ?? rowsError, saveError].filter(Boolean).join("\n");
   errorEl.textContent = err ?? "";
   errorEl.hidden = !err;
 }
@@ -195,7 +208,7 @@ function renderBody(): void {
     return;
   }
   let shown = applyFilters(rows, view.filters);
-  renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length }, onFiltersChanged);
+  renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
   renderTable(tableEl, view, shown, columns, handlers, sort);
 }
@@ -236,6 +249,7 @@ async function loadRows(): Promise<void> {
 
 function applyRows(r: Row[], at: string | null, err: string | null): void {
   rows = r;
+  rowsLoaded = true;
   fetchedAt = at;
   rowsError = err;
   renderChrome();

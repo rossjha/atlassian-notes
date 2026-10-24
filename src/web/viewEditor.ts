@@ -119,6 +119,7 @@ export function openViewEditor(
       dialog.close();
     } catch (e) {
       showError((e as Error).message);
+      resetConfirm();
       busy(false);
       drawColumns();
     }
@@ -143,6 +144,11 @@ export function openViewEditor(
   };
 
   let confirming = false;
+  const resetConfirm = (): void => {
+    confirming = false;
+    del.textContent = "Delete";
+    del.classList.remove("ve-danger");
+  };
   const del = h("button", { type: "button", class: "btn ve-delete" }, "Delete");
   del.addEventListener("click", () => {
     if (!onDelete) return;
@@ -160,6 +166,11 @@ export function openViewEditor(
     del.title = "A view is required; this is the last one";
   }
 
+  const resetOnOther = (e: Event): void => {
+    if (confirming && e.target !== del) resetConfirm();
+  };
+  dialog.addEventListener("click", resetOnOther);
+  dialog.addEventListener("input", resetOnOther);
   const cancel = h("button", { type: "button", class: "btn", onclick: () => dialog.close() }, "Cancel");
   const form = h("div", { class: "ve-form" },
     h("h2", { class: "ve-title" }, view ? "Edit view" : "New view"),
