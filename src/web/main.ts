@@ -13,6 +13,7 @@ import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme } from "./themes.ts";
+import { tabNavDir, withPageTransition } from "./motion.ts";
 
 // Fallback: public/theme-init.js (a blocking script in <head>) normally applies the saved theme before first paint.
 applySavedTheme();
@@ -308,14 +309,28 @@ async function commitJqlEdit(): Promise<void> {
   if (jqlEditor) el.focus();
 }
 
+/** Position along the tab bar: Kanban is 0, then the views in order; -1 if unknown. */
+function tabIndex(id: string | null): number {
+  if (id === BOARD_TAB) return 0;
+  const i = views.findIndex((v) => v.id === id);
+  return i < 0 ? -1 : i + 1;
+}
+
 function selectTab(id: string): void {
+  // Measured before views/activeId move on. Null (no slide) for a re-selected tab, the first selection, or a deleted tab.
+  const dir = tabNavDir(tabIndex(activeId), tabIndex(id));
   if (jqlEditor && jqlEditor.viewId !== id) jqlEditor = null;
   activeId = id;
   remember(id);
-  if (id === BOARD_TAB) {
-    rowsSeq++; // supersede any in-flight rows fetch
+  // State changes above and below stay synchronous (callers such as saveEditedView read activeId straight after);
+  // only the re-render runs inside the view transition, which may call it a frame later.
+  const paint = () => {
     renderChrome();
     renderBody();
+  };
+  if (id === BOARD_TAB) {
+    rowsSeq++; // supersede any in-flight rows fetch
+    withPageTransition(dir, paint);
     void loadBoard();
     return;
   }
@@ -324,9 +339,13 @@ function selectTab(id: string): void {
   fetchedAt = null;
   rowsError = null;
   rowsLoaded = false;
-  renderChrome();
-  renderBody();
+  withPageTransition(dir, paint);
   void loadRows();
+}
+
+/** The active tab's underline: its own element so a tab switch can glide it (view-transition-name in styles.css). */
+function tabIndicator(): HTMLElement {
+  return h("span", { class: "tab-indicator", "aria-hidden": "true" });
 }
 
 function renderChrome(): void {
@@ -336,11 +355,13 @@ function renderChrome(): void {
   tabsListEl.replaceChildren(
     h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onBoard ? " active" : ""}`, title: "Kanban", "aria-label": "Kanban", onclick: () => selectTab(BOARD_TAB) }, icon("viewColumns", "tab-svg")),
+      onBoard ? tabIndicator() : null,
     ),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
+        v.id === activeId ? tabIndicator() : null,
       ),
     ),
   );
