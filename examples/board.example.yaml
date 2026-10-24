@@ -1,5 +1,6 @@
 columns: [Backlog, Doing, PEN, Done]
 archiveColumn: Done
+noteColumn: Doing
 cards:
   Backlog: []
   Doing: []

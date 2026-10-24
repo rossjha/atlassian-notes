@@ -210,7 +210,7 @@ export class BoardService {
     const { notesDir, onChange } = this.deps;
     await updateBoard(notesDir, (b) => applyBoardOp(b, op));
     onChange({ type: "board" });
-    if (op.op === "add" && !(await this.knownKeys()).has(op.key)) {
+    if ((op.op === "add" || op.op === "move") && !(await this.knownKeys()).has(op.key)) {
       this.refresh().catch((e) => console.error("board refresh failed:", errMessage(e)));
     }
   }
@@ -222,7 +222,7 @@ export class BoardService {
       board = await loadBoard(notesDir);
     } catch (e) {
       const msg = e instanceof ConfigFileError ? e.message : errMessage(e);
-      return { columns: [], archiveColumn: "", cards: {}, fetchedAt: null, error: msg, locked: true };
+      return { columns: [], archiveColumn: "", noteColumn: "", cards: {}, fetchedAt: null, error: msg, locked: true };
     }
     const cached = await cache.read(BOARD_CACHE_ID);
     const own = new Map(cached.tickets.map((t) => [t.key, t]));
@@ -244,6 +244,7 @@ export class BoardService {
     return {
       columns: board.columns,
       archiveColumn: board.archiveColumn,
+      noteColumn: board.noteColumn,
       cards,
       fetchedAt: cached.fetchedAt,
       error: cached.error,

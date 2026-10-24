@@ -76,6 +76,7 @@ test("deleted key is shown missing, others load, and not-found is remembered for
   });
   await svc.refresh();
   const v = await svc.view([], []);
+  assert.equal(v.noteColumn, "Doing");
   const cards = v.cards.Backlog;
   assert.deepEqual(cards.map((c) => c.key), ["A-1", "GONE-1", "A-2"]);
   assert.equal(cards[1].missing, true);

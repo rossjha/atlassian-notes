@@ -106,6 +106,7 @@ export interface Row {
 export interface BoardFile {
   columns: string[];
   archiveColumn: string;
+  noteColumn: string;
   cards: Record<string, string[]>;
 }
 
@@ -131,6 +132,7 @@ export interface BoardCard {
 export interface BoardResponse {
   columns: string[];
   archiveColumn: string;
+  noteColumn: string;
   cards: Record<string, BoardCard[]>;
   fetchedAt: string | null;
   error: string | null;

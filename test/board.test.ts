@@ -31,6 +31,7 @@ afterEach(async () => {
 const sample = (): BoardFile => ({
   columns: ["Backlog", "Doing", "Done"],
   archiveColumn: "Done",
+  noteColumn: "Doing",
   cards: { Backlog: [], Doing: ["A-1", "B-2"], Done: ["C-3"] },
 });
 
@@ -40,6 +41,16 @@ test("parseBoard on the example gives 4 empty columns", async () => {
   assert.equal(b.columns.length, 4);
   assert.equal(b.archiveColumn, "Done");
   for (const c of b.columns) assert.deepEqual(b.cards[c], []);
+});
+
+test("parseBoard noteColumn defaults to Doing, else the first column, and must exist", () => {
+  assert.equal(parseBoard("columns: [Backlog, Doing, Done]\n", "board.yaml").noteColumn, "Doing");
+  assert.equal(parseBoard("columns: [A, B]\n", "board.yaml").noteColumn, "A");
+  assert.equal(parseBoard("columns: [A, B]\nnoteColumn: B\n", "board.yaml").noteColumn, "B");
+  assert.throws(
+    () => parseBoard("columns: [A, B]\nnoteColumn: Nope\n", "/x/board.yaml"),
+    (e: unknown) => e instanceof ConfigFileError && /noteColumn/.test(e.message),
+  );
 });
 
 test("parseBoard normalises cards", (t) => {
@@ -61,6 +72,7 @@ test("parseBoard rejects bad files with ConfigFileError", () => {
     "columns: [1, 2]\n",
     "columns: [A, A]\n",
     "columns: [A, B]\narchiveColumn: Nope\n",
+    "columns: [A, B]\nnoteColumn: Nope\n",
   ]) {
     assert.throws(
       () => parseBoard(text, "/x/board.yaml"),
@@ -73,7 +85,7 @@ test("parseBoard rejects bad files with ConfigFileError", () => {
 test("serialiseBoard round-trips with flow-style columns", () => {
   const b = sample();
   const text = serialiseBoard(b);
-  assert.match(text, /^columns: \[Backlog, Doing, Done\]\narchiveColumn: Done\ncards:/);
+  assert.match(text, /^columns: \[Backlog, Doing, Done\]\narchiveColumn: Done\nnoteColumn: Doing\ncards:/);
   assert.deepEqual(parseBoard(text, "board.yaml"), b);
   assert.deepEqual(boardKeys(b), ["A-1", "B-2", "C-3"]);
 });

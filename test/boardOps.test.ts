@@ -4,10 +4,11 @@ import { applyOpLocal } from "../src/shared/boardOps.ts";
 import { applyBoardOp } from "../src/server/board.ts";
 import type { BoardFile, BoardOp, BoardResponse } from "../src/shared/types.ts";
 
-const file: BoardFile = { columns: ["A", "B"], archiveColumn: "B", cards: { A: ["X-1", "X-2", "X-3"], B: ["X-4", "X-5"] } };
+const file: BoardFile = { columns: ["A", "B"], archiveColumn: "B", noteColumn: "A", cards: { A: ["X-1", "X-2", "X-3"], B: ["X-4", "X-5"] } };
 const resp: BoardResponse = {
   columns: file.columns,
   archiveColumn: "B",
+  noteColumn: "A",
   cards: Object.fromEntries(Object.entries(file.cards).map(([c, ks]) => [c, ks.map((key) => ({ key, row: null, missing: false }))])),
   fetchedAt: null,
   error: null,
@@ -38,4 +39,10 @@ test("applyOpLocal leaves add to the server and does not mutate its input", () =
   applyOpLocal(resp, { op: "move", key: "X-1", column: "B", index: 0 });
   applyOpLocal(resp, { op: "archive" });
   assert.equal(JSON.stringify(resp), before);
+});
+
+test("applyOpLocal clamps an index of MAX_SAFE_INTEGER to the end, like the server", () => {
+  const op: BoardOp = { op: "move", key: "X-1", column: "B", index: Number.MAX_SAFE_INTEGER };
+  assert.deepEqual(keys(applyOpLocal(resp, op)).B, ["X-4", "X-5", "X-1"]);
+  assert.deepEqual(applyBoardOp(file, op).cards.B, ["X-4", "X-5", "X-1"]);
 });

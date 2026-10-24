@@ -16,6 +16,7 @@ export class BoardOpError extends Error {
 const DEFAULT_BOARD: BoardFile = {
   columns: ["Backlog", "Doing", "PEN", "Done"],
   archiveColumn: "Done",
+  noteColumn: "Doing",
   cards: { Backlog: [], Doing: [], PEN: [], Done: [] },
 };
 
@@ -41,6 +42,10 @@ export function parseBoard(text: string, file: string): BoardFile {
   if (typeof archiveColumn !== "string" || !columns.includes(archiveColumn)) {
     throw new ConfigFileError(file, `archiveColumn "${String(archiveColumn)}" is not one of the columns`);
   }
+  const noteColumn = raw.noteColumn ?? (columns.includes("Doing") ? "Doing" : columns[0]);
+  if (typeof noteColumn !== "string" || !columns.includes(noteColumn)) {
+    throw new ConfigFileError(file, `noteColumn "${String(noteColumn)}" is not one of the columns`);
+  }
   const rawCards = raw.cards ?? {};
   if (!isObj(rawCards)) throw new ConfigFileError(file, "cards must be a mapping");
 
@@ -62,7 +67,7 @@ export function parseBoard(text: string, file: string): BoardFile {
   };
   for (const c of columns) if (Object.hasOwn(rawCards, c)) place(c, rawCards[c]);
   for (const [c, list] of Object.entries(rawCards)) if (!columns.includes(c)) place(columns[0], list);
-  return { columns, archiveColumn, cards };
+  return { columns, archiveColumn, noteColumn, cards };
 }
 
 export function serialiseBoard(b: BoardFile): string {
@@ -72,6 +77,7 @@ export function serialiseBoard(b: BoardFile): string {
   const doc = new YAML.Document({
     columns,
     archiveColumn: b.archiveColumn,
+    noteColumn: b.noteColumn,
     cards: Object.fromEntries(b.columns.map((c) => [c, b.cards[c] ?? []])),
   });
   return doc.toString({ flowCollectionPadding: false });
@@ -85,6 +91,7 @@ function clone(b: BoardFile): BoardFile {
   return {
     columns: [...b.columns],
     archiveColumn: b.archiveColumn,
+    noteColumn: b.noteColumn,
     cards: Object.fromEntries(b.columns.map((c) => [c, [...(b.cards[c] ?? [])]])),
   };
 }

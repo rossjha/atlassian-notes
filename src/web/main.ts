@@ -1,10 +1,10 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
-import { applyFilters, sortRows } from "../shared/rowOps.ts";
+import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal } from "../shared/boardOps.ts";
 import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
 import { h, relativeTime } from "./dom.ts";
-import { configureDrawer, drawerOnLive, openDrawer } from "./drawer.ts";
+import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
 import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
@@ -41,7 +41,41 @@ let rowsSeq = 0;
 let sort: SortState | null = null;
 
 const root = document.body;
-const tabsEl = h("nav", { class: "tabs" });
+const tabsListEl = h("div", { class: "tabs-list" });
+const searchHint = h("span", { class: "ticket-search-hint", role: "alert" });
+searchHint.hidden = true;
+const searchInput = h("input", {
+  type: "text",
+  class: "ticket-search-input",
+  placeholder: "Ticket key…",
+  "aria-label": "Open ticket by key",
+  autocomplete: "off",
+  spellcheck: "false",
+}) as HTMLInputElement;
+const searchForm = h("form", { class: "ticket-search" }, searchInput, searchHint);
+searchInput.addEventListener("input", () => {
+  searchHint.hidden = true;
+});
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  e.preventDefault();
+  searchInput.value = "";
+  searchHint.hidden = true;
+});
+searchForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const key = searchInput.value.trim().toUpperCase();
+  if (key === "") return;
+  if (!isValidKeyClient(key)) {
+    searchHint.textContent = "Enter a key like ABC-123";
+    searchHint.hidden = false;
+    return;
+  }
+  searchInput.value = "";
+  searchHint.hidden = true;
+  openDrawer(key, { fromSearch: true });
+});
+const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm);
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
 const filterEl = h("div", { class: "filter-bar" });
@@ -52,6 +86,17 @@ root.append(h("main", { class: "app" }, tabsEl, headerEl, orphansEl, errorEl, fi
 configureDrawer({
   getRow: (key) => rows.find((r) => r.ticket.key === key) ?? boardRow(key),
   onNoteSaved: () => void loadRows(),
+  star: {
+    isStarred: (k) => boardKeys.has(k),
+    toggle: toggleStar,
+    get disabled() {
+      return !boardReady || boardLocked;
+    },
+    get locked() {
+      return boardReady && boardLocked;
+    },
+  },
+  onNoteSavedFromSearch: noteImpliesDoing,
 });
 function boardRow(key: string): Row | undefined {
   if (!boardData) return undefined;
@@ -262,7 +307,7 @@ function selectTab(id: string): void {
 function renderChrome(): void {
   const locked = viewsLocked();
   const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
-  tabsEl.replaceChildren(
+  tabsListEl.replaceChildren(
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
@@ -270,9 +315,9 @@ function renderChrome(): void {
       ),
     ),
   );
-  if (!locked) tabsEl.append(h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"));
+  if (!locked) tabsListEl.append(h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"));
   const onBoard = activeId === BOARD_TAB;
-  tabsEl.append(
+  tabsListEl.append(
     h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
       h("button", { type: "button", class: `tab${onBoard ? " active" : ""}`, onclick: () => selectTab(BOARD_TAB) }, "★ My board"),
     ),
@@ -394,6 +439,18 @@ function toggleStar(key: string): void {
   });
 }
 
+/** A note was saved from a search-opened drawer: a ticket that isn't on the board goes to the note column. */
+function noteImpliesDoing(key: string, body: string): void {
+  if (body.trim() === "" || !boardReady || boardLocked || !boardData || boardKeys.has(key)) return;
+  const column = boardData.noteColumn;
+  if (!column) return;
+  boardKeys = new Set(boardKeys).add(key);
+  submitBoardOp({ op: "move", key, column, index: Number.MAX_SAFE_INTEGER }, () => {
+    boardKeys = new Set(boardKeys);
+    boardKeys.delete(key);
+  });
+}
+
 function boardOp(op: BoardOp): void {
   if (!boardData || boardData.locked) return;
   boardData = applyOpLocal(boardData, op);
@@ -432,6 +489,7 @@ const boardHandlers: BoardHandlers = {
 };
 
 function renderBody(): void {
+  drawerSyncStar(); // the drawer's ★ follows the board even while a table render is deferred
   // Never rebuild the table under an open editor; apply the latest state once it closes.
   if (isEditing() || isDragging()) {
     renderDeferred = true;

@@ -21,7 +21,13 @@ body {
 
 @layer components {
   .app { padding: 0.75rem 1rem; }
-  .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--line); }
+  .tabs-list { display: flex; gap: 0.25rem; flex: 1; min-width: 0; flex-wrap: wrap; }
+  .ticket-search { display: flex; align-items: center; gap: 0.5rem; flex: none; }
+  .ticket-search-input { width: 9rem; padding: 0.2rem 0.5rem; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text); }
+  .ticket-search-input:focus { outline: none; border-color: var(--accent); }
+  .ticket-search-hint { font-size: 11px; color: #fca5a5; white-space: nowrap; }
+  .dr-star { flex: none; font-size: 18px; }
   .tab { padding: 0.4rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; background: none; }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--text); border-bottom-color: var(--accent); }

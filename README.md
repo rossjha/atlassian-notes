@@ -75,12 +75,14 @@ The **★ My board** tab is a personal kanban for tickets you want to come back 
   ```yaml
   columns: [Backlog, Doing, PEN, Done]
   archiveColumn: Done
+  noteColumn: Doing       # optional; where a note on a searched-for ticket puts it (default Doing, else the first column)
   cards:                  # written by the app; order in a list = order on the board
     Backlog: []
     Doing: [PAY-412]
   ```
 
   A card under an unknown column goes to the first column, and a repeated key is kept once. If `board.yaml` can't be parsed, the board shows the error and its controls (and the table stars) are disabled until you fix the file; the app never rewrites a file it couldn't read.
+- **Ticket search:** type a key (any case, e.g. `pay-412`) into the box at the right of the tabs and press Enter to open that ticket's panel, whether or not it is in a view. Esc clears the box. The panel has its own ★ that adds the ticket to the first column or removes it. If the ticket isn't already on your board, saving a non-empty note in a panel opened this way moves it to the `noteColumn` (default Doing). Tickets already on the board are never moved by a note, and notes written from the table views don't touch the board.
 - **Archive:** the `archiveColumn` lane has an **Archive all** button (click it, then click "Archive N cards?" within 4 seconds). It only takes those cards off the board, like un-starring them. Your notes are kept.
 - **Refresh:** the board fetches its tickets from Jira by key, independently of your JQL views. A ticket Jira can't find (deleted, or no permission) shows as "not found in Jira" and the rest of the board still loads.
 

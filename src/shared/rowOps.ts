@@ -64,3 +64,8 @@ export function sortRows(rows: Row[], columnId: string, dir: "asc" | "desc"): Ro
     })
     .map((e) => e.row);
 }
+
+/** Mirrors the server's isValidKey (src/server/frontMatter.ts); used to validate the header search input. */
+export function isValidKeyClient(key: string): boolean {
+  return /^[A-Z][A-Z0-9_]*-[1-9][0-9]*$/.test(key);
+}

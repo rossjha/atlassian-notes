@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { isValidKeyClient } from "../src/shared/rowOps.ts";
 import { parseFrontMatter, stringifyFrontMatter, isValidKey } from "../src/server/frontMatter.ts";
 
 test("parses front matter and body", () => {
@@ -41,6 +42,14 @@ test("isValidKey", () => {
   for (const k of ["pay-1", "../X-1", "PAY-0", "PAY-1.md", "PAY-1/..", ""]) {
     assert.equal(isValidKey(k), false, k);
   }
+});
+
+test("isValidKeyClient mirrors isValidKey", () => {
+  for (const k of ["PAY-412", "AB_2-1", "pay-1", "../X-1", "PAY-0", "PAY-1.md", "PAY-1/..", "", " PAY-1", "PAY-1\n", "A-01", "1A-1"]) {
+    assert.equal(isValidKeyClient(k), isValidKey(k), JSON.stringify(k));
+  }
+  assert.equal(isValidKeyClient("PAY-412"), true);
+  assert.equal(isValidKeyClient("pay-1"), false);
 });
 
 test("blank front matter block parses as empty front matter", () => {

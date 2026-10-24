@@ -8,9 +8,14 @@ export interface DrawerHooks {
   getRow(key: string): Row | undefined;
   /** Called after the drawer saved a note, so the table can reload. */
   onNoteSaved(): void;
+  /** Present when the personal board is available. `disabled` is read live, on every render and sync. */
+  star?: { isStarred(key: string): boolean; toggle(key: string): void; readonly disabled: boolean; readonly locked?: boolean };
+  /** A note with text was saved in a drawer that was opened from the header search. */
+  onNoteSavedFromSearch?(key: string, body: string): void;
 }
 
 let hooks: DrawerHooks = { getRow: () => undefined, onNoteSaved: () => {} };
+let fromSearch = false; // per drawer-open; cleared on close and on a non-search reopen
 let shell: HTMLElement | null = null;
 let openKey: string | null = null;
 let payload: TicketResponse | null = null;
@@ -29,9 +34,14 @@ export function currentDrawerKey(): string | null {
   return openKey;
 }
 
-export function openDrawer(key: string): void {
-  if (openKey === key && shell) return;
+export function openDrawer(key: string, opts: { fromSearch?: boolean } = {}): void {
+  if (openKey === key && shell) {
+    if (!opts.fromSearch) fromSearch = false;
+    shell.querySelector<HTMLElement>(".dr-panel")?.focus();
+    return;
+  }
   if (!shell) lastFocus = document.activeElement;
+  fromSearch = opts.fromSearch === true;
   openKey = key;
   payload = null;
   fetchError = null;
@@ -54,6 +64,7 @@ export function closeDrawer(): void {
   shell = null;
   openKey = null;
   payload = null;
+  fromSearch = false;
   document.removeEventListener("keydown", onKeydown, true);
   const link = key ? document.querySelector<HTMLElement>(`a[data-open="${CSS.escape(key)}"]`) : null;
   const target = link ?? (lastFocus instanceof HTMLElement && lastFocus.isConnected ? lastFocus : null);
@@ -70,6 +81,36 @@ export function drawerOnLive(key: string): void {
     return;
   }
   void load();
+}
+
+function starTitle(star: NonNullable<DrawerHooks["star"]>, on: boolean): string {
+  return star.disabled ? (star.locked ? "board.yaml has an error" : "Board unavailable") : on ? "Remove from my board" : "Add to my board";
+}
+
+function starButton(key: string): HTMLElement | null {
+  const star = hooks.star;
+  if (!star) return null;
+  const btn = h("button", { type: "button", class: "star-btn dr-star", onclick: () => star.toggle(key) });
+  applyStar(btn, key, star);
+  return btn;
+}
+
+function applyStar(btn: HTMLElement, key: string, star: NonNullable<DrawerHooks["star"]>): void {
+  const on = star.isStarred(key);
+  btn.className = `star-btn dr-star${on ? " on" : ""}`;
+  btn.setAttribute("aria-pressed", String(on));
+  btn.setAttribute("aria-label", `Star ${key}`);
+  btn.setAttribute("title", starTitle(star, on));
+  btn.textContent = on ? "★" : "☆";
+  if (star.disabled) btn.setAttribute("disabled", "");
+  else btn.removeAttribute("disabled");
+}
+
+/** Board state changed: update the ★ in place (no re-render, so an open note editor is untouched). */
+export function drawerSyncStar(): void {
+  const star = hooks.star;
+  const btn = shell?.querySelector<HTMLElement>(".dr-star");
+  if (star && btn && openKey) applyStar(btn, openKey, star);
 }
 
 function seqBump(): number {
@@ -179,8 +220,12 @@ function noteSection(key: string, row: Row | null): HTMLElement {
     cell.classList.add("dr-editable");
     cell.addEventListener("click", (e) => {
       if (cell.querySelector(".editor-wrap") || (e.target as Element).closest("a,button")) return;
+      const before = row.note; // editNote assigns a new object on a successful save
       editNote(cell, row, () => {
         hooks.onNoteSaved();
+        if (fromSearch && row.note && row.note !== before && row.note.body.trim() !== "") {
+          hooks.onNoteSavedFromSearch?.(key, row.note.body);
+        }
         diskNotice = false;
         renderNotice();
         show(true); // until the refetch below brings the rendered HTML
@@ -222,6 +267,7 @@ function render(): void {
 
   const header = h("header", { class: "dr-head" },
     h("div", { class: "dr-title" },
+      starButton(key),
       h("code", { class: "key" }, key),
       h("span", { class: "dr-summary" }, t?.summary ?? ""),
       t ? h("span", { class: `pill cat-${t.statusCategory.replace(/\W+/g, "-").toLowerCase()}` }, t.status) : null,
