@@ -4,6 +4,7 @@ import { isMenuOpen, menuButton } from "./viewMenu.ts";
 import { api, type CopyKind, type TicketResponse } from "./api.ts";
 import { copyToClipboard, h, setHtml } from "./dom.ts";
 import { editNote, isEditing } from "./editors.ts";
+import { motionAllowed, motionMs } from "./motion.ts";
 
 export interface DrawerHooks {
   /** The current table row for a key, if it is in the active view. */
@@ -28,6 +29,8 @@ let diskNotice = false;
 let fetchSeq = 0;
 let lastFocus: Element | null = null;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+// A closed drawer still playing its exit animation; removed on animationend (or the timeout), or reused by a re-open.
+let closing: { el: HTMLElement; cancel: () => void; finish: () => void } | null = null;
 
 export function configureDrawer(next: DrawerHooks): void {
   hooks = next;
@@ -50,8 +53,8 @@ export function openDrawer(key: string, opts: { fromSearch?: boolean } = {}): vo
   fetchError = null;
   diskNotice = false;
   if (!shell) {
-    shell = h("div", { class: "dr-shell" });
-    document.body.append(shell);
+    shell = reclaimClosing() ?? h("div", { class: "dr-shell" });
+    if (!shell.isConnected) document.body.append(shell);
     document.addEventListener("keydown", onKeydown, true);
   }
   render();
@@ -63,7 +66,7 @@ export function closeDrawer(): void {
   if (!shell) return;
   const key = openKey;
   seqBump();
-  shell.remove();
+  dismiss(shell);
   shell = null;
   openKey = null;
   payload = null;
@@ -73,6 +76,42 @@ export function closeDrawer(): void {
   const target = link ?? (lastFocus instanceof HTMLElement && lastFocus.isConnected ? lastFocus : null);
   target?.focus();
   lastFocus = null;
+}
+
+/** Plays the exit animation, then removes the shell; at once when motion is off. */
+function dismiss(el: HTMLElement): void {
+  closing?.finish(); // only one drawer is ever closing
+  if (!motionAllowed()) {
+    el.remove();
+    return;
+  }
+  el.classList.add("dr-closing");
+  const panel = el.querySelector(".dr-panel");
+  const onEnd = (e: Event) => {
+    if (e.target === panel) finish();
+  };
+  const cancel = () => {
+    clearTimeout(timer);
+    el.removeEventListener("animationend", onEnd);
+    if (closing?.el === el) closing = null;
+  };
+  const finish = () => {
+    cancel();
+    el.remove();
+  };
+  const timer = setTimeout(finish, motionMs("--motion-exit", 240) + 50);
+  el.addEventListener("animationend", onEnd);
+  closing = { el, cancel, finish };
+}
+
+/** A re-open during the exit animation keeps the same shell: cancel its removal and play the entrance again. */
+function reclaimClosing(): HTMLElement | null {
+  if (!closing) return null;
+  const { el } = closing;
+  closing.cancel();
+  el.classList.remove("dr-closing");
+  el.replaceChildren(); // render() builds a fresh backdrop + panel, whose entrance animations then play
+  return el;
 }
 
 /** Live note/groom events: refetch, but never replace an open editor. */
@@ -315,9 +354,15 @@ function render(): void {
 
   const right = h("div", { class: "dr-col" }, noteSection(key, row), groomSection(row));
   const body = h("div", { class: "dr-body" }, left, right);
-  const panel = h("aside", { class: "dr-panel", role: "dialog", "aria-label": `Ticket ${key}`, tabindex: "-1" }, header, body);
   const hadFocus = shell.contains(document.activeElement);
-  shell.replaceChildren(h("div", { class: "dr-backdrop", onclick: closeDrawer }), panel);
+  // Backdrop and panel persist across re-renders, so their entrance animations play once per open, not on every refetch.
+  let panel = shell.querySelector<HTMLElement>(":scope > .dr-panel");
+  if (!panel) {
+    panel = h("aside", { class: "dr-panel", role: "dialog", tabindex: "-1" });
+    shell.replaceChildren(h("div", { class: "dr-backdrop", onclick: closeDrawer }), panel);
+  }
+  panel.setAttribute("aria-label", `Ticket ${key}`);
+  panel.replaceChildren(header, body);
   body.scrollTop = prevScroll;
   if (hadFocus || document.activeElement === document.body) panel.focus();
 }
