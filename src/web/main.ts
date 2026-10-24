@@ -6,7 +6,7 @@ import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
 import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
 import { h, relativeTime } from "./dom.ts";
-import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer } from "./drawer.ts";
+import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer, closeDrawer, currentDrawerKey } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
 import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
@@ -64,8 +64,9 @@ const searchInput = h("input", {
 // Not while a modal dialog is open; focusing search blurs an open note editor, which saves it as usual.
 document.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() !== "s" || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
-  if (document.querySelector("dialog[open]")) return;
+  if (e.defaultPrevented || document.querySelector("dialog[open]")) return;
   e.preventDefault();
+  if (currentDrawerKey()) closeDrawer(); // the search box sits behind the side panel
   searchInput.focus();
   searchInput.select();
 });
