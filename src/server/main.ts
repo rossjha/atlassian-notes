@@ -88,6 +88,8 @@ async function main(): Promise<void> {
       cache,
       notes,
       getCustom: async () => (await loadColumns(config.notesDir)).custom,
+      getViewIds: async () =>
+        (await loadViews(config.notesDir, await loadColumns(config.notesDir))).map((v) => v.id),
     }),
   );
   const refresher = new Refresher({

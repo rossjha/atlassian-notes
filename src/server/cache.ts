@@ -49,26 +49,31 @@ export class ViewCache {
     return out;
   }
 
-  /** Every ticket in every cache file (views and the board). Later files win on duplicate keys. */
-  async allCachedTickets(): Promise<{ tickets: Map<string, Ticket>; cacheFiles: number }> {
+  /**
+   * Tickets from the caches named by `ids`. On duplicate keys the cache with the newest
+   * fetchedAt wins (null loses). `cacheFiles` counts caches that were read OK and have
+   * fetched at least once; an offline first start leaves fetchedAt null.
+   */
+  async allCachedTickets(ids: string[]): Promise<{ tickets: Map<string, Ticket>; cacheFiles: number }> {
     const tickets = new Map<string, Ticket>();
+    const winner = new Map<string, string>();
     let cacheFiles = 0;
-    let names: string[];
-    try {
-      names = (await fs.readdir(this.dir)).filter((n) => n.endsWith(".json")).sort();
-    } catch {
-      return { tickets, cacheFiles };
-    }
-    for (const name of names) {
+    for (const id of [...new Set(ids)].sort()) {
+      let v: { fetchedAt?: unknown; tickets?: unknown };
       try {
-        const v = JSON.parse(await fs.readFile(path.join(this.dir, name), "utf8"));
-        if (!v || !Array.isArray(v.tickets)) continue;
-        cacheFiles++;
-        for (const t of v.tickets as Ticket[]) {
-          if (t && typeof t.key === "string") tickets.set(t.key, t);
-        }
+        v = JSON.parse(await fs.readFile(this.file(id), "utf8"));
       } catch {
-        // missing or corrupt
+        continue; // missing or corrupt
+      }
+      if (!v || !Array.isArray(v.tickets)) continue;
+      const fetchedAt = typeof v.fetchedAt === "string" ? v.fetchedAt : null;
+      if (fetchedAt !== null) cacheFiles++;
+      for (const t of v.tickets as Ticket[]) {
+        if (!t || typeof t.key !== "string") continue;
+        const prev = winner.get(t.key);
+        if (prev !== undefined && (fetchedAt ?? "") <= prev) continue;
+        tickets.set(t.key, t);
+        winner.set(t.key, fetchedAt ?? "");
       }
     }
     return { tickets, cacheFiles };

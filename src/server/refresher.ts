@@ -73,6 +73,15 @@ export class Refresher {
   }
 
   private async runAll(): Promise<void> {
+    try {
+      await this.refreshAndReconcile();
+    } finally {
+      // A broken views file must not leave ticket files stale; sync failures are logged by the syncer.
+      await this.deps.ticketFiles?.sync();
+    }
+  }
+
+  private async refreshAndReconcile(): Promise<void> {
     const { jira, cache, notes, getViews, onChange, statePath, board } = this.deps;
     const views = await getViews();
     for (const v of views) {
@@ -107,7 +116,6 @@ export class Refresher {
       this.orphanKeys = orphans;
       onChange({ type: "orphans" });
     }
-    await this.deps.ticketFiles?.sync();
   }
 
   scheduleTicketFiles(): void {

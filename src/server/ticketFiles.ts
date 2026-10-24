@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { CustomColumnDef, Ticket } from "../shared/types.ts";
+import { BOARD_CACHE_ID } from "./boardService.ts";
 import type { ViewCache } from "./cache.ts";
 import { isValidKey, stringifyFrontMatter } from "./frontMatter.ts";
 import { atomicWrite, type NotesStore } from "./notesStore.ts";
@@ -44,8 +45,9 @@ export function renderTicketFile(t: Ticket, ctx: TicketFileContext): string {
       if (typeof value !== "string") continue;
       customProps[RESERVED_PROPS.includes(id) ? `note_${id}` : id] = value;
       if (def.type === "select" && value !== "") {
+        const col = tagSlug(id);
         const slug = tagSlug(value);
-        if (slug) tags.push(`${id}/${slug}`);
+        if (col && slug) tags.push(`${col}/${slug}`);
       }
     }
   }
@@ -88,8 +90,11 @@ export async function syncTicketFiles(deps: {
   cache: ViewCache;
   notes: NotesStore;
   getCustom: () => Promise<Record<string, CustomColumnDef>>;
+  getViewIds: () => Promise<string[]>;
 }): Promise<{ written: number; deleted: number }> {
-  const { tickets, cacheFiles } = await deps.cache.allCachedTickets();
+  // Only current views plus the board: caches of removed views must not keep ticket files alive.
+  const ids = [...(await deps.getViewIds()), BOARD_CACHE_ID];
+  const { tickets, cacheFiles } = await deps.cache.allCachedTickets(ids);
   const custom = await deps.getCustom();
   const dir = path.join(path.resolve(deps.notesDir), TICKETS_DIR);
   let written = 0;

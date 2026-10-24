@@ -45,7 +45,9 @@ function ticket(key: string, over: Partial<Ticket> = {}): Ticket {
 
 const noCtx = { note: null, hasGroom: false, custom: {} };
 const getCustom = async (): Promise<Record<string, CustomColumnDef>> => ({});
-const deps = () => ({ notesDir: dir, cache, notes, getCustom });
+const T1 = "2026-10-24T10:00:00.000Z";
+const getViewIds = async () => ["v1"];
+const deps = () => ({ notesDir: dir, cache, notes, getCustom, getViewIds });
 const tpath = (k: string) => path.join(dir, "jira/tickets", `${k}.md`);
 
 test("tagSlug", () => {
@@ -132,7 +134,7 @@ test("reserved custom column id is namespaced", () => {
 test("note with broken front matter", async () => {
   await fs.mkdir(path.join(dir, "jira/notes"), { recursive: true });
   await fs.writeFile(path.join(dir, "jira/notes/AAA-1.md"), "---\nfoo: [\n---\nbody");
-  await cache.write("v1", { fetchedAt: null, tickets: [ticket("AAA-1")], error: null });
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
   await syncTicketFiles({
     ...deps(),
     getCustom: async () => ({ foo: { label: "Foo", type: "text" } }),
@@ -144,7 +146,7 @@ test("note with broken front matter", async () => {
 
 test("odd summary text", async () => {
   const summary = "a ]] b | c\n# d key: x";
-  await cache.write("v1", { fetchedAt: null, tickets: [ticket("AAA-1", { summary })], error: null });
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1", { summary })], error: null });
   await syncTicketFiles(deps());
   const out = await fs.readFile(tpath("AAA-1"), "utf8");
   assert.equal(parseFrontMatter(out).data.summary, summary);
@@ -152,7 +154,7 @@ test("odd summary text", async () => {
 });
 
 test("writes only changed files", async () => {
-  await cache.write("v1", { fetchedAt: null, tickets: [ticket("AAA-1")], error: null });
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
   assert.deepEqual(await syncTicketFiles(deps()), { written: 1, deleted: 0 });
   const m1 = (await fs.stat(tpath("AAA-1"))).mtimeMs;
   await new Promise((r) => setTimeout(r, 20));
@@ -161,7 +163,7 @@ test("writes only changed files", async () => {
 });
 
 test("prunes stale ticket files", async () => {
-  await cache.write("v1", { fetchedAt: null, tickets: [ticket("AAA-1")], error: null });
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
   await fs.mkdir(path.join(dir, "jira/tickets"), { recursive: true });
   await fs.writeFile(tpath("AAA-9"), "old");
   const r = await syncTicketFiles(deps());
@@ -177,8 +179,53 @@ test("does not prune when there are no cache files", async () => {
   await fs.stat(tpath("AAA-9"));
 });
 
+test("a cache that never fetched does not trigger a prune", async () => {
+  await cache.write("v1", { fetchedAt: null, tickets: [], error: "offline" });
+  await fs.mkdir(path.join(dir, "jira/tickets"), { recursive: true });
+  await fs.writeFile(tpath("AAA-9"), "old");
+  assert.deepEqual(await syncTicketFiles(deps()), { written: 0, deleted: 0 });
+  await fs.stat(tpath("AAA-9"));
+});
+
+test("a stale cache for a removed view does not keep its ticket file", async () => {
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
+  await cache.write("old-view", { fetchedAt: T1, tickets: [ticket("AAA-7")], error: null });
+  await fs.mkdir(path.join(dir, "jira/tickets"), { recursive: true });
+  await fs.writeFile(tpath("AAA-7"), "old");
+  const r = await syncTicketFiles(deps());
+  assert.equal(r.deleted, 1);
+  await assert.rejects(fs.stat(tpath("AAA-7")));
+  await fs.stat(tpath("AAA-1"));
+});
+
+test("duplicate key: the newest fetchedAt wins regardless of file name order", async () => {
+  await cache.write("a", { fetchedAt: "2026-10-24T12:00:00.000Z", tickets: [ticket("AAA-1", { summary: "newer" })], error: null });
+  await cache.write("z", { fetchedAt: "2026-10-24T09:00:00.000Z", tickets: [ticket("AAA-1", { summary: "older" })], error: null });
+  await cache.write("m", { fetchedAt: null, tickets: [ticket("AAA-1", { summary: "never" })], error: null });
+  await syncTicketFiles({ ...deps(), getViewIds: async () => ["z", "a", "m"] });
+  assert.equal(parseFrontMatter(await fs.readFile(tpath("AAA-1"), "utf8")).data.summary, "newer");
+});
+
+test("a failing getViewIds skips the sync and prunes nothing", async () => {
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
+  await fs.mkdir(path.join(dir, "jira/tickets"), { recursive: true });
+  await fs.writeFile(tpath("AAA-9"), "old");
+  await assert.rejects(syncTicketFiles({ ...deps(), getViewIds: async () => { throw new Error("bad yaml"); } }));
+  await fs.stat(tpath("AAA-9"));
+  await assert.rejects(fs.stat(tpath("AAA-1")));
+});
+
+test("tags use a slug of the custom column id", () => {
+  const out = renderTicketFile(ticket("AAA-1"), {
+    note: { data: { "my col#1": "High Risk", "###": "x" }, parseError: null },
+    hasGroom: false,
+    custom: { "my col#1": { label: "Col", type: "select", options: { "High Risk": "High Risk" } }, "###": { label: "Bad", type: "select", options: { x: "x" } } },
+  });
+  assert.deepEqual(parseFrontMatter(out).data.tags, ["jira/story", "my-col-1/high-risk"]);
+});
+
 test("skips invalid keys", async () => {
-  await cache.write("v1", { fetchedAt: null, tickets: [ticket("../evil")], error: null });
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("../evil")], error: null });
   const r = await syncTicketFiles(deps());
   assert.equal(r.written, 0);
   await assert.rejects(fs.stat(path.join(dir, "jira/evil.md")));
@@ -186,7 +233,7 @@ test("skips invalid keys", async () => {
 });
 
 test("leaves non-ticket files alone", async () => {
-  await cache.write("v1", { fetchedAt: null, tickets: [ticket("AAA-1")], error: null });
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
   await fs.mkdir(path.join(dir, "jira/tickets"), { recursive: true });
   await fs.writeFile(tpath("README"), "keep");
   await fs.writeFile(path.join(dir, "jira/tickets/README.md"), "keep");
@@ -195,7 +242,7 @@ test("leaves non-ticket files alone", async () => {
 });
 
 test("union spans view and board caches", async () => {
-  await cache.write("_board", { fetchedAt: null, tickets: [ticket("BBB-2")], error: null });
+  await cache.write("_board", { fetchedAt: T1, tickets: [ticket("BBB-2")], error: null });
   await syncTicketFiles(deps());
   await fs.stat(tpath("BBB-2"));
 });

@@ -7,6 +7,7 @@ import { ViewCache } from "../src/server/cache.ts";
 import { Refresher } from "../src/server/refresher.ts";
 import { NotesStore } from "../src/server/notesStore.ts";
 import { JiraError, type JiraClient } from "../src/server/jira.ts";
+import { createTicketFileSyncer, syncTicketFiles } from "../src/server/ticketFiles.ts";
 import type { LiveEvent, Ticket, View } from "../src/shared/types.ts";
 
 const view: View = { id: "current", name: "Current", jql: "project = PAY", limit: 50, columns: [], filters: {} };
@@ -170,4 +171,35 @@ test("runAll syncs ticket files once at the end", async () => {
   assert.deepEqual(calls, ["sync after reconcile"]);
   r.scheduleTicketFiles();
   assert.deepEqual(calls, ["sync after reconcile", "schedule"]);
+});
+
+test("runAll still syncs ticket files when getViews throws", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-sync-"));
+  let synced = 0;
+  const r = new Refresher({
+    jira: {} as JiraClient, cache: new ViewCache(dir), notes: new NotesStore(dir),
+    getViews: async () => { throw new Error("bad yaml"); }, onChange: () => {},
+    statePath: path.join(dir, ".cache", "reconcile.json"),
+    ticketFiles: { sync: async () => { synced++; }, schedule: () => {} },
+  });
+  await assert.rejects(r.refreshAll(), /bad yaml/);
+  assert.equal(synced, 1);
+});
+
+test("refreshAll writes jira/tickets files through the real syncer", async () => {
+  const { dir, notes, cache } = setup(async () => []);
+  const jira = {
+    search: async () => [{ ...t("100", "PAY-1"), type: "Story", status: "To Do" } as Ticket],
+    getIssueBrief: async () => null,
+    getIssueDetail: async () => { throw new Error("unused"); },
+  } as unknown as JiraClient;
+  const r = new Refresher({
+    jira, cache, notes, getViews: async () => [view], onChange: () => {},
+    statePath: path.join(dir, ".cache", "reconcile.json"),
+    ticketFiles: createTicketFileSyncer(() =>
+      syncTicketFiles({ notesDir: dir, cache, notes, getCustom: async () => ({}), getViewIds: async () => [view.id] }),
+    ),
+  });
+  await r.refreshAll();
+  assert.ok(fs.existsSync(path.join(dir, "jira", "tickets", "PAY-1.md")));
 });
