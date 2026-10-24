@@ -335,7 +335,7 @@ function renderChrome(): void {
   const onBoard = activeId === BOARD_TAB;
   tabsListEl.replaceChildren(
     h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
-      h("button", { type: "button", class: `tab tab-kanban${onBoard ? " active" : ""}`, onclick: () => selectTab(BOARD_TAB) }, icon("viewColumns", "tab-svg"), "Kanban"),
+      h("button", { type: "button", class: `tab tab-kanban${onBoard ? " active" : ""}`, title: "Kanban", "aria-label": "Kanban", onclick: () => selectTab(BOARD_TAB) }, icon("viewColumns", "tab-svg")),
     ),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...views.map((v) =>
