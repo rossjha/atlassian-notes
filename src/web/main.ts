@@ -1,6 +1,7 @@
-import type { BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
+import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
+import { applyOpLocal, isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
 import { h, relativeTime } from "./dom.ts";
 import { configureDrawer, drawerOnLive, openDrawer } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
@@ -10,6 +11,8 @@ import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 
 const TAB_KEY = "atlassian-notes.activeTab";
+/** Special tab id; never a view id (view ids can't contain "_"). */
+const BOARD_TAB = "__board";
 
 let views: View[] = [];
 let columns: ColumnsConfig | null = null;
@@ -23,12 +26,15 @@ let rowsLoaded = false;
 // Inline JQL editor in the view header; kept across renderChrome() so typing survives re-renders.
 let jqlEditor: { viewId: string; el: HTMLTextAreaElement } | null = null;
 let boardKeys = new Set<string>();
+let boardData: BoardResponse | null = null;
+let boardLoadError: string | null = null;
+let boardRefreshing = false;
 let boardReady = false; // true once GET /api/board has succeeded
 let boardLocked = false; // board.yaml is broken (server-reported)
 let boardSeq = 0; // bumped when a load starts
-let opSeq = 0; // bumped when a star toggle starts
+let opSeq = 0; // bumped when a star toggle or board op starts
 let pendingOps = 0;
-let starError = false; // saveError was set by a star op
+let opError = false; // saveError was set by a star/board op
 const refreshingIds = new Set<string>();
 let rowsSeq = 0;
 let sort: SortState | null = null;
@@ -43,9 +49,17 @@ orphansEl.hidden = true;
 const tableEl = h("div", { class: "table-wrap" });
 root.append(h("main", { class: "app" }, tabsEl, headerEl, orphansEl, errorEl, filterEl, tableEl));
 configureDrawer({
-  getRow: (key) => rows.find((r) => r.ticket.key === key),
+  getRow: (key) => rows.find((r) => r.ticket.key === key) ?? boardRow(key),
   onNoteSaved: () => void loadRows(),
 });
+function boardRow(key: string): Row | undefined {
+  if (!boardData) return undefined;
+  for (const cards of Object.values(boardData.cards)) {
+    const card = cards.find((c) => c.key === key);
+    if (card?.row) return card.row;
+  }
+  return undefined;
+}
 let orphans: Orphan[] = [];
 let orphansOpen = false;
 
@@ -227,6 +241,13 @@ function selectTab(id: string): void {
   if (jqlEditor && jqlEditor.viewId !== id) jqlEditor = null;
   activeId = id;
   remember(id);
+  if (id === BOARD_TAB) {
+    rowsSeq++; // supersede any in-flight rows fetch
+    renderChrome();
+    renderBody();
+    void loadBoard();
+    return;
+  }
   sort = null;
   rows = [];
   fetchedAt = null;
@@ -249,6 +270,12 @@ function renderChrome(): void {
     ),
   );
   if (!locked) tabsEl.append(h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"));
+  const onBoard = activeId === BOARD_TAB;
+  tabsEl.append(
+    h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
+      h("button", { type: "button", class: `tab${onBoard ? " active" : ""}`, onclick: () => selectTab(BOARD_TAB) }, "★ My board"),
+    ),
+  );
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {
@@ -279,13 +306,14 @@ function renderChrome(): void {
       },
     }, `${orphans.length} orphaned ${orphans.length === 1 ? "note" : "notes"}`));
   }
+  headerEl.hidden = onBoard && orphans.length === 0; // the board draws its own header
   orphansEl.hidden = !(orphansOpen && orphans.length > 0);
   orphansEl.replaceChildren(
     h("div", { class: "text-muted" }, "Notes whose ticket is no longer found in Jira. The files are left untouched."),
     ...orphans.map((o) => h("div", { class: "orphan-row" }, h("code", { class: "key" }, o.key), h("code", { class: "text-muted" }, o.notePath), h("code", { class: "text-muted" }, o.groomPath))),
   );
-  const err = [configError ?? rowsError, saveError].filter(Boolean).join("\n");
-  errorEl.textContent = err ?? "";
+  const err = (onBoard ? [boardData?.error ?? boardLoadError, saveError] : [configError ?? rowsError, saveError]).filter(Boolean).join("\n");
+  errorEl.textContent = err;
   errorEl.hidden = !err;
 }
 
@@ -293,8 +321,13 @@ let renderDeferred = false;
 onEditorsIdle(() => {
   if (renderDeferred) renderBody();
 });
+onDragIdle(() => {
+  if (renderDeferred) renderBody();
+});
 
 function applyBoard(b: BoardResponse): void {
+  boardData = b;
+  boardLoadError = null;
   boardKeys = new Set(Object.values(b.cards).flatMap((cs) => cs.map((c) => c.key)));
   boardLocked = b.locked;
   boardReady = true;
@@ -309,11 +342,42 @@ async function loadBoard(): Promise<void> {
     const b = await api.board();
     if (stale()) return;
     applyBoard(b);
-  } catch {
+  } catch (e) {
     if (stale()) return;
     boardReady = false; // errors surface on the board tab
+    boardLoadError = (e as Error).message;
   }
+  renderChrome();
   renderBody();
+}
+
+/** Sends one board op; the caller has already applied its optimistic change. Only the latest op's response is applied. */
+function submitBoardOp(op: BoardOp, revert?: () => void): void {
+  const id = ++opSeq;
+  pendingOps++;
+  renderBody();
+  api.boardOp(op).then(
+    (b) => {
+      pendingOps--;
+      if (id !== opSeq) return; // a newer op's response carries the truth
+      applyBoard(b); // server truth, including concurrent changes
+      if (opError) {
+        saveError = null;
+        opError = false;
+      }
+      renderChrome();
+      renderBody();
+    },
+    (e: Error) => {
+      pendingOps--;
+      revert?.();
+      saveError = e.message;
+      opError = true;
+      renderChrome();
+      renderBody();
+      void loadBoard();
+    },
+  );
 }
 
 function toggleStar(key: string): void {
@@ -322,42 +386,62 @@ function toggleStar(key: string): void {
   boardKeys = new Set(boardKeys);
   if (starred) boardKeys.delete(key);
   else boardKeys.add(key);
-  const id = ++opSeq;
-  pendingOps++;
-  renderBody();
-  api.boardOp({ op: starred ? "remove" : "add", key }).then(
-    (b) => {
-      pendingOps--;
-      if (id !== opSeq) return; // a newer toggle's response carries the truth
-      applyBoard(b); // server truth, including concurrent changes
-      if (starError) {
-        saveError = null;
-        starError = false;
-      }
-      renderChrome();
-      renderBody();
-    },
-    (e: Error) => {
-      pendingOps--;
-      boardKeys = new Set(boardKeys); // revert only this key
-      if (starred) boardKeys.add(key);
-      else boardKeys.delete(key);
-      saveError = e.message;
-      starError = true;
-      renderChrome();
-      renderBody();
-      void loadBoard();
-    },
-  );
+  submitBoardOp({ op: starred ? "remove" : "add", key }, () => {
+    boardKeys = new Set(boardKeys); // revert only this key
+    if (starred) boardKeys.add(key);
+    else boardKeys.delete(key);
+  });
 }
+
+function boardOp(op: BoardOp): void {
+  if (!boardData || boardData.locked) return;
+  boardData = applyOpLocal(boardData, op);
+  boardKeys = new Set(Object.values(boardData.cards).flatMap((cs) => cs.map((c) => c.key)));
+  submitBoardOp(op); // on failure loadBoard() restores the server's board
+}
+
+async function refreshBoard(): Promise<void> {
+  if (boardRefreshing) return;
+  boardRefreshing = true;
+  renderChrome();
+  renderBody();
+  try {
+    const b = await api.refreshBoard();
+    boardSeq++; // supersede any in-flight load
+    if (pendingOps === 0) applyBoard(b);
+  } catch (e) {
+    saveError = (e as Error).message;
+    opError = true;
+  } finally {
+    boardRefreshing = false;
+    renderChrome();
+    renderBody();
+  }
+}
+
+const boardHandlers: BoardHandlers = {
+  onOpen: (key) => openDrawer(key),
+  onOp: boardOp,
+  onNoteSaved: () => void loadBoard(),
+  onRefresh: () => void refreshBoard(),
+  refreshing: false,
+};
 
 function renderBody(): void {
   // Never rebuild the table under an open editor; apply the latest state once it closes.
-  if (isEditing()) {
+  if (isEditing() || isDragging()) {
     renderDeferred = true;
     return;
   }
   renderDeferred = false;
+  if (activeId === BOARD_TAB) {
+    filterEl.replaceChildren();
+    filterEl.hidden = true;
+    if (boardData) renderBoard(tableEl, boardData, { ...boardHandlers, refreshing: boardRefreshing });
+    else tableEl.replaceChildren(h("p", { class: "empty-state" }, boardLoadError ? "" : "Loading board…"));
+    return;
+  }
+  filterEl.hidden = false;
   const view = activeView();
   if (!view || !columns) {
     filterEl.replaceChildren();
@@ -385,18 +469,19 @@ async function loadConfig(): Promise<void> {
   } catch (e) {
     configError = (e as Error).message;
   }
-  if (!views.some((v) => v.id === activeId)) {
+  if (activeId !== BOARD_TAB && !views.some((v) => v.id === activeId)) {
     const saved = remembered();
-    activeId = views.find((v) => v.id === saved)?.id ?? views[0]?.id ?? null;
+    activeId = saved === BOARD_TAB ? BOARD_TAB : views.find((v) => v.id === saved)?.id ?? views[0]?.id ?? null;
   }
   renderChrome();
   renderBody();
-  await loadRows();
+  if (activeId === BOARD_TAB) await loadBoard();
+  else await loadRows();
 }
 
 async function loadRows(): Promise<void> {
   const id = activeId;
-  if (!id) return;
+  if (!id || id === BOARD_TAB) return;
   const seq = ++rowsSeq;
   try {
     const r = await api.rows(id);
@@ -431,7 +516,7 @@ function applyRows(r: Row[], at: string | null, err: string | null): void {
 
 async function doRefresh(): Promise<void> {
   const id = activeId;
-  if (!id || refreshingIds.has(id)) return;
+  if (!id || id === BOARD_TAB || refreshingIds.has(id)) return;
   refreshingIds.add(id);
   renderChrome();
   try {
@@ -456,6 +541,7 @@ function onLive(e: LiveEvent): void {
     case "note":
     case "groom":
       void loadRows();
+      if (activeId === BOARD_TAB) void loadBoard();
       drawerOnLive(e.key);
       break;
     case "views":
@@ -472,8 +558,8 @@ function onLive(e: LiveEvent): void {
 }
 
 setInterval(() => {
-  const el = headerEl.querySelector(".last-refreshed");
-  if (el) el.textContent = `Last refreshed ${relativeTime(fetchedAt)}`;
+  const el = document.querySelector(".last-refreshed");
+  if (el) el.textContent = `Last refreshed ${relativeTime(activeId === BOARD_TAB ? boardData?.fetchedAt ?? null : fetchedAt)}`;
 }, 30_000); // keep "last refreshed" fresh
 connectLive(onLive);
 void loadConfig();
