@@ -78,6 +78,7 @@ searchForm.addEventListener("submit", (e) => {
 const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm);
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
+errorEl.hidden = true; // shown by renderChrome only when there is an error; avoids an empty red bar on load
 const filterEl = h("div", { class: "filter-bar" });
 const orphansEl = h("div", { class: "orphans-panel" });
 orphansEl.hidden = true;

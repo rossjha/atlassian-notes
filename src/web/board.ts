@@ -61,7 +61,7 @@ function cardEl(
   const row: Row | null = card.row;
   if (!row) {
     el.append(
-      h("div", { class: "card-line" }, h("span", { class: "key" }, card.key), remove),
+      h("div", { class: "card-line" }, h("button", { type: "button", class: "key card-key", onclick: () => handlers.onOpen(card.key) }, card.key), remove),
       h("div", { class: "text-muted" }, card.missing ? "not found in Jira" : "loading…"),
     );
   } else {
@@ -92,8 +92,8 @@ function cardEl(
     }
     el.append(
       h("div", { class: "card-line" },
-        h("span", { class: "key" }, t.key),
-        h("button", { type: "button", class: "card-title", onclick: () => handlers.onOpen(t.key) }, t.summary),
+        h("button", { type: "button", class: "key card-key", title: "Open details", onclick: () => handlers.onOpen(t.key) }, t.key),
+        h("span", { class: "card-title" }, t.summary),
         remove,
       ),
       lineTwo,
@@ -271,7 +271,7 @@ function focusSpot(container: HTMLElement): FocusSpot | null {
   const siblings = lane ? [...lane.querySelectorAll<HTMLElement>("[data-card-key]")] : [];
   return {
     key: card.getAttribute("data-card-key")!,
-    control: active === card ? "card" : active.classList.contains("card-x") ? "x" : active.classList.contains("card-title") ? "title" : "card",
+    control: active === card ? "card" : active.classList.contains("card-x") ? "x" : active.classList.contains("card-key") ? "title" : "card",
     lane: lane?.getAttribute("aria-label") ?? null,
     index: siblings.indexOf(card),
   };
@@ -280,7 +280,7 @@ function focusSpot(container: HTMLElement): FocusSpot | null {
 function restoreFocus(container: HTMLElement, spot: FocusSpot): void {
   const card = findCardEl(container, spot.key);
   if (card) {
-    const target = spot.control === "card" ? card : card.querySelector<HTMLElement>(spot.control === "x" ? ".card-x" : ".card-title");
+    const target = spot.control === "card" ? card : card.querySelector<HTMLElement>(spot.control === "x" ? ".card-x" : ".card-key");
     (target && !target.hasAttribute("disabled") ? target : card).focus();
     return;
   }
