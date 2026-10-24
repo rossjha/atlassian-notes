@@ -93,7 +93,10 @@ searchForm.addEventListener("submit", (e) => {
   searchHint.hidden = true;
   openDrawer(key, { fromSearch: true });
 });
-const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm, themePickerButton());
+const tabIndicatorEl = h("span", { class: "tab-indicator", "aria-hidden": "true" });
+tabIndicatorEl.hidden = true;
+const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm, themePickerButton(), tabIndicatorEl);
+const rowsCache = new Map<string, { rows: Row[]; fetchedAt: string | null; error: string | null }>();
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
 errorEl.hidden = true; // shown by renderChrome only when there is an error; avoids an empty red bar on load
@@ -346,18 +349,37 @@ function selectTab(id: string): void {
     return;
   }
   sort = null;
-  rows = [];
-  fetchedAt = null;
-  rowsError = null;
-  rowsLoaded = false;
+  // Show this view's last rows straight away (refreshed below), so the slide carries real content, not "No tickets".
+  const cached = rowsCache.get(id);
+  rows = cached?.rows ?? [];
+  fetchedAt = cached?.fetchedAt ?? null;
+  rowsError = cached?.error ?? null;
+  rowsLoaded = cached !== undefined;
   withPageTransition(dir, paint, [headerEl, filterEl, tableEl]);
   void loadRows();
 }
 
-/** The active tab's underline: its own element so a tab switch can glide it (view-transition-name in styles.css). */
-function tabIndicator(): HTMLElement {
-  return h("span", { class: "tab-indicator", "aria-hidden": "true" });
+/** Places the single active-tab underline under the active tab. It lives on the nav (not inside a tab), so it
+ * survives re-renders and its CSS left/width transition glides it between tabs. */
+function placeTabIndicator(): void {
+  const active = tabsListEl.querySelector<HTMLElement>(".tab-wrap.active");
+  if (!active) {
+    tabIndicatorEl.hidden = true;
+    return;
+  }
+  const nav = tabsEl.getBoundingClientRect();
+  const r = active.getBoundingClientRect();
+  tabIndicatorEl.hidden = false;
+  tabIndicatorEl.style.setProperty("left", `${r.left - nav.left - tabsEl.clientLeft}px`);
+  tabIndicatorEl.style.setProperty("width", `${r.width}px`);
+  tabIndicatorEl.style.setProperty("top", `${r.bottom - nav.top - tabsEl.clientTop - 2}px`);
+  if (!tabIndicatorEl.classList.contains("tab-indicator-ready")) requestAnimationFrame(() => tabIndicatorEl.classList.add("tab-indicator-ready"));
 }
+void document.fonts?.ready.then(() => placeTabIndicator()); // tab widths change once JetBrains Mono loads
+window.addEventListener("resize", () => {
+  tabIndicatorEl.classList.remove("tab-indicator-ready"); // no glide while resizing
+  placeTabIndicator();
+});
 
 function renderChrome(): void {
   const locked = viewsLocked();
@@ -366,17 +388,16 @@ function renderChrome(): void {
   tabsListEl.replaceChildren(
     h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onBoard ? " active" : ""}`, title: "Kanban", "aria-label": "Kanban", onclick: () => selectTab(BOARD_TAB) }, icon("viewColumns", "tab-svg")),
-      onBoard ? tabIndicator() : null,
     ),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
         h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
-        v.id === activeId ? tabIndicator() : null,
       ),
     ),
   );
   if (!locked) tabsListEl.append(h("button", { type: "button", class: "icon-btn tab-add", title: "Add view", "aria-label": "Add view", onclick: () => editView(null) }, icon("plusCircle", "icon-btn-svg")));
+  placeTabIndicator();
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {
@@ -635,6 +656,7 @@ async function loadOrphans(): Promise<void> {
 }
 
 function applyRows(r: Row[], at: string | null, err: string | null): void {
+  if (activeId && activeId !== BOARD_TAB) rowsCache.set(activeId, { rows: r, fetchedAt: at, error: err });
   rows = r;
   rowsLoaded = true;
   fetchedAt = at;

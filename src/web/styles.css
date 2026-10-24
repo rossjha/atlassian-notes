@@ -71,7 +71,7 @@ body {
 
 @layer components {
   .app { padding: 0.75rem 1rem; }
-  .tabs { display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border); }
+  .tabs { position: relative; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border); }
   .tabs-list { display: flex; gap: 0.25rem; flex: 1; min-width: 0; flex-wrap: wrap; }
   .ticket-search { display: flex; align-items: center; gap: 0.5rem; flex: none; }
   .ticket-search-field { position: relative; display: flex; align-items: center; }
@@ -180,7 +180,8 @@ body {
   /* The 2px transparent border reserves the underline's space; the underline itself is .tab-indicator, laid over it,
      so a tab switch can glide it as its own view-transition group. */
   .tab-wrap { position: relative; display: inline-flex; align-items: center; border-bottom: 2px solid transparent; }
-  .tab-indicator { position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; background: var(--accent); pointer-events: none; }
+  .tab-indicator { position: absolute; height: 2px; background: var(--accent); pointer-events: none; }
+  .tab-indicator[hidden] { display: none; }
   .tab-wrap .tab, .tab-wrap .tab.active { border-bottom: 0; }
   .icon-btn[aria-expanded="true"] { color: var(--accent); }
   .menu { position: absolute; z-index: 40; min-width: 10rem; padding: 0.25rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow); display: flex; flex-direction: column; }
@@ -356,6 +357,8 @@ nav.tabs { view-transition-name: an-tabs; }
   :root:not([data-motion="off"])::view-transition-group(an-tabs),
   :root:not([data-motion="off"])::view-transition-new(an-tabs) { animation: none; }
   :root:not([data-motion="off"])::view-transition-old(an-tabs) { display: none; }
+  /* The one active-tab underline glides between tabs (see placeTabIndicator in main.ts). */
+  :root:not([data-motion="off"]) .tab-indicator-ready { transition: left var(--motion-page) var(--motion-ease), width var(--motion-page) var(--motion-ease); }
   :root:not([data-motion="off"])::view-transition-group(an-tab-indicator) {
     animation-duration: var(--motion-page);
     animation-timing-function: var(--motion-ease);
