@@ -21,6 +21,7 @@ export const THEMES: readonly ThemeInfo[] = [
 ];
 
 export const DEFAULT_THEME = "carbon";
+// Keep the key and the ids above in sync with public/theme-init.js, which applies the theme before first paint.
 const THEME_KEY = "atlassian-notes.theme";
 
 export function isThemeId(id: unknown): id is string {

@@ -1,4 +1,5 @@
 /* Copied from forge packages/theme/src/themes.css @ 0bee37f — re-copy to update.
+   When re-copying, also update the swatches in src/web/themes.ts and the id list in public/theme-init.js.
    (Only the ten theme blocks; forge's trailing motion tokens are not used here.) */
 :root,
 [data-theme="carbon"] {

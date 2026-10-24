@@ -16,6 +16,7 @@ export const PACK_INCLUDE: string[] = [
   "src",
   "public/index.html",
   "public/fonts",
+  "public/theme-init.js",
 ];
 
 export function isExcluded(name: string): boolean {

@@ -14,7 +14,7 @@ import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme } from "./themes.ts";
 
-// Before the first render, so a saved theme never flashes the default one.
+// Fallback: public/theme-init.js (a blocking script in <head>) normally applies the saved theme before first paint.
 applySavedTheme();
 
 const TAB_KEY = "atlassian-notes.activeTab";
