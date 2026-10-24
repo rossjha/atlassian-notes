@@ -55,10 +55,20 @@ const searchInput = h("input", {
   type: "text",
   class: "ticket-search-input",
   placeholder: "Ticket key…",
+  title: "Open a ticket by key (⌘S)",
   "aria-label": "Open ticket by key",
   autocomplete: "off",
   spellcheck: "false",
 }) as HTMLInputElement;
+// ⌘S / Ctrl+S jumps to the ticket search (instead of the browser's "Save page").
+// Not while a modal dialog is open; focusing search blurs an open note editor, which saves it as usual.
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() !== "s" || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+  if (document.querySelector("dialog[open]")) return;
+  e.preventDefault();
+  searchInput.focus();
+  searchInput.select();
+});
 const searchForm = h("form", { class: "ticket-search" }, h("label", { class: "ticket-search-field" }, icon("magnifyingGlass", "ticket-search-icon"), searchInput), searchHint);
 searchInput.addEventListener("input", () => {
   searchHint.hidden = true;
