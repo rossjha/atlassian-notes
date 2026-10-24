@@ -9,13 +9,17 @@ function dot(title: string): HTMLElement {
 }
 
 function copyPromptLink(key: string): HTMLElement {
-  const text = h("span", {}, "copy groom prompt");
-  const link = h("button", { type: "button", class: "link-btn link-icon", title: "Copy the groom prompt for Claude" },
-    icon("claude", "link-svg brand-claude"), text);
+  const title = `Copy the groom prompt for ${key} (paste into Claude)`;
+  const link = h("button", { type: "button", class: "icon-btn icon-btn-sm", title, "aria-label": title }, icon("square2Stack", "link-svg"));
   link.addEventListener("click", async (e) => {
     e.stopPropagation();
-    text.textContent = (await copyToClipboard(() => api.copyPrompt(key))) ? "Copied" : "Copy failed";
-    setTimeout(() => (text.textContent = "copy groom prompt"), 1500);
+    const ok = await copyToClipboard(() => api.copyPrompt(key));
+    link.replaceChildren(icon(ok ? "check" : "square2Stack", "link-svg"));
+    link.title = ok ? "Copied" : "Copy failed";
+    setTimeout(() => {
+      link.replaceChildren(icon("square2Stack", "link-svg"));
+      link.title = title;
+    }, 1500);
   });
   return link;
 }

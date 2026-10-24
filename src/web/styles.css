@@ -54,6 +54,7 @@ body {
   .icon-btn:hover:not([disabled]) { color: var(--fg); background: var(--surface-2); }
   .icon-btn[disabled] { cursor: default; opacity: 0.6; }
   .icon-btn-svg { width: 16px; height: 16px; }
+  .icon-btn-sm { width: 1.4rem; height: 1.4rem; }
   .icon-spin { animation: icon-spin 0.9s linear infinite; }
   @keyframes icon-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .icon-spin { animation: none; } }
@@ -62,8 +63,7 @@ body {
   .link-icon { display: inline-flex; align-items: center; gap: 0.3rem; }
   .link-svg { width: 12px; height: 12px; flex: none; }
   /* Brand marks keep their own colours in every theme. */
-  .brand-claude { color: #d97757; }
-  .brand-jira { color: #2684ff; }
+  .brand-claude, .brand-jira { color: var(--muted); }
   .tabs-divider { align-self: center; color: var(--border); padding: 0 0.25rem; user-select: none; }
   .ticket-search-hint { font-size: 11px; color: var(--danger); white-space: nowrap; }
   .star-btn.dr-star { flex: none; font-size: 18px; }
