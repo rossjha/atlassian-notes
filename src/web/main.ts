@@ -23,8 +23,12 @@ let rowsLoaded = false;
 // Inline JQL editor in the view header; kept across renderChrome() so typing survives re-renders.
 let jqlEditor: { viewId: string; el: HTMLTextAreaElement } | null = null;
 let boardKeys = new Set<string>();
-let boardLocked = true; // disabled until GET /api/board succeeds
-let boardSeq = 0;
+let boardReady = false; // true once GET /api/board has succeeded
+let boardLocked = false; // board.yaml is broken (server-reported)
+let boardSeq = 0; // bumped when a load starts
+let opSeq = 0; // bumped when a star toggle starts
+let pendingOps = 0;
+let starError = false; // saveError was set by a star op
 const refreshingIds = new Set<string>();
 let rowsSeq = 0;
 let sort: SortState | null = null;
@@ -293,43 +297,56 @@ onEditorsIdle(() => {
 function applyBoard(b: BoardResponse): void {
   boardKeys = new Set(Object.values(b.cards).flatMap((cs) => cs.map((c) => c.key)));
   boardLocked = b.locked;
+  boardReady = true;
 }
 
 async function loadBoard(): Promise<void> {
   const seq = ++boardSeq;
+  const ops = opSeq;
+  // A result is stale if a newer load started, or a toggle started/is in flight (its own response resyncs).
+  const stale = () => seq !== boardSeq || ops !== opSeq || pendingOps > 0;
   try {
     const b = await api.board();
-    if (seq !== boardSeq) return;
+    if (stale()) return;
     applyBoard(b);
   } catch {
-    if (seq !== boardSeq) return;
-    boardLocked = true; // errors surface on the board tab
+    if (stale()) return;
+    boardReady = false; // errors surface on the board tab
   }
   renderBody();
 }
 
 function toggleStar(key: string): void {
-  if (boardLocked) return;
+  if (!boardReady || boardLocked) return;
   const starred = boardKeys.has(key);
-  const previous = boardKeys;
-  boardKeys = new Set(previous);
+  boardKeys = new Set(boardKeys);
   if (starred) boardKeys.delete(key);
   else boardKeys.add(key);
-  boardSeq++; // supersede any in-flight board fetch
+  const id = ++opSeq;
+  pendingOps++;
   renderBody();
   api.boardOp({ op: starred ? "remove" : "add", key }).then(
     (b) => {
-      boardSeq++;
+      pendingOps--;
+      if (id !== opSeq) return; // a newer toggle's response carries the truth
       applyBoard(b); // server truth, including concurrent changes
-      saveError = null;
+      if (starError) {
+        saveError = null;
+        starError = false;
+      }
       renderChrome();
       renderBody();
     },
     (e: Error) => {
-      boardKeys = previous;
+      pendingOps--;
+      boardKeys = new Set(boardKeys); // revert only this key
+      if (starred) boardKeys.add(key);
+      else boardKeys.delete(key);
       saveError = e.message;
+      starError = true;
       renderChrome();
       renderBody();
+      void loadBoard();
     },
   );
 }
@@ -349,7 +366,7 @@ function renderBody(): void {
   }
   const tableHandlers: TableHandlers = {
     ...handlers,
-    star: { isStarred: (k) => boardKeys.has(k), toggle: toggleStar, disabled: boardLocked },
+    star: { isStarred: (k) => boardKeys.has(k), toggle: toggleStar, disabled: !boardReady || boardLocked, locked: boardReady && boardLocked },
   };
   let shown = applyFilters(rows, view.filters);
   const locked = viewsLocked();

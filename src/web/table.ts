@@ -10,7 +10,7 @@ export interface TableHandlers {
   onToggleDisplay?(columnId: string): void;
   onNoteSaved(): void;
   /** Present when the personal board is available: adds a fixed first column of star toggles. */
-  star?: { isStarred(key: string): boolean; toggle(key: string): void; disabled: boolean };
+  star?: { isStarred(key: string): boolean; toggle(key: string): void; disabled: boolean; locked?: boolean };
 }
 
 export interface SortState {
@@ -28,8 +28,8 @@ function starCell(key: string, star: NonNullable<TableHandlers["star"]>): HTMLEl
     type: "button",
     class: `star-btn${on ? " on" : ""}`,
     "aria-pressed": String(on),
-    "aria-label": `${on ? "Remove" : "Add"} ${key} ${on ? "from" : "to"} my board`,
-    title: star.disabled ? "board.yaml has an error" : on ? "Remove from my board" : "Add to my board",
+    "aria-label": `Star ${key}`,
+    title: star.disabled ? (star.locked ? "board.yaml has an error" : "Board unavailable") : on ? "Remove from my board" : "Add to my board",
     onclick: (e: Event) => {
       e.stopPropagation();
       star.toggle(key);
