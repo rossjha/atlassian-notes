@@ -9,6 +9,7 @@ import { watchNotesDir } from "../src/server/watcher.ts";
 import { ViewCache } from "../src/server/cache.ts";
 import { NotesStore } from "../src/server/notesStore.ts";
 import { Refresher } from "../src/server/refresher.ts";
+import { BoardService } from "../src/server/boardService.ts";
 import { ensureDataDir, loadColumns, loadViews } from "../src/server/configFiles.ts";
 import type { Config } from "../src/server/config.ts";
 import type { JiraClient } from "../src/server/jira.ts";
@@ -37,6 +38,7 @@ let server: http.Server;
 let port: number;
 let stopWatch: () => void;
 let refresherRef: Refresher;
+let boardRef: BoardService;
 const base = () => `http://localhost:${port}`;
 const J = { "Content-Type": "application/json" };
 const put = (p: string, body: unknown, headers: Record<string, string> = J) =>
@@ -60,7 +62,13 @@ before(async () => {
     statePath: path.join(dir, ".cache", "reconcile.json"),
   });
   refresherRef = refresher;
-  const app = createApp({ config, jira, notes, cache, refresher, publicDir });
+  const board = new BoardService({
+    jira, cache, notes, notesDir: dir,
+    statePath: path.join(dir, ".cache", "board-state.json"),
+    onChange: (e) => broadcast(e),
+  });
+  boardRef = board;
+  const app = createApp({ config, jira, notes, cache, refresher, board, publicDir });
   broadcast = app.broadcast;
   server = app.server;
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -68,7 +76,8 @@ before(async () => {
   stopWatch = watchNotesDir(dir, app.broadcast);
 });
 
-after(() => {
+after(async () => {
+  await boardRef.refresh(); // settle any background refresh triggered by an add
   stopWatch();
   server.closeAllConnections();
   server.close();
@@ -310,4 +319,68 @@ test("SSE delivers a groom event when a groom file is written", async () => {
   }
   ac.abort();
   assert.ok(buf.includes('data: {"type":"groom","key":"PAY-1"}\n\n'), buf);
+});
+
+const boardFile = () => path.join(dir, "board.yaml");
+const postOp = (body: unknown, headers: Record<string, string> = J) =>
+  fetch(base() + "/api/board/ops", { method: "POST", headers, body: JSON.stringify(body) });
+
+test("GET /api/board on a fresh data dir returns 4 empty columns, unlocked", async () => {
+  const res = await fetch(base() + "/api/board");
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.columns.length, 4);
+  assert.equal(body.locked, false);
+  for (const c of body.columns) assert.deepEqual(body.cards[c], []);
+});
+
+test("board ops: add, move, and validation failures", async () => {
+  const add = await postOp({ op: "add", key: "PAY-1" });
+  assert.equal(add.status, 200);
+  const added = await add.json();
+  assert.equal(added.cards.Backlog[0].key, "PAY-1");
+  assert.match(fs.readFileSync(boardFile(), "utf8"), /PAY-1/);
+
+  const move = await postOp({ op: "move", key: "PAY-1", column: "Doing", index: 0 });
+  assert.equal(move.status, 200);
+  const moved = await move.json();
+  assert.equal(moved.cards.Doing[0].key, "PAY-1");
+  assert.deepEqual(moved.cards.Backlog, []);
+
+  assert.equal((await postOp({ op: "move", key: "PAY-1", column: "Nope", index: 0 })).status, 400);
+  assert.equal((await postOp({ op: "add", key: "../x" })).status, 400);
+  assert.equal((await postOp({ op: "explode" })).status, 400);
+  assert.equal((await postOp({ op: "move", key: "PAY-1", column: "Doing", index: -1 })).status, 400);
+  assert.equal((await postOp({ op: "move", key: "PAY-1", column: "Doing", index: 1.5 })).status, 400);
+  assert.equal((await postOp({ op: "add", key: 5 })).status, 400);
+  assert.equal((await postOp({ op: "move", key: "PAY-1", column: 7, index: 0 })).status, 400);
+});
+
+test("POST /api/board/refresh returns the board", async () => {
+  const res = await fetch(base() + "/api/board/refresh", { method: "POST", headers: J });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.cards.Doing[0].key, "PAY-1");
+  assert.equal(body.cards.Doing[0].row.ticket.key, "PAY-1");
+});
+
+test("board ops enforce the Content-Type gate", async () => {
+  assert.equal((await postOp({ op: "archive" }, { "Content-Type": "text/plain" })).status, 415);
+});
+
+test("corrupted board.yaml: GET is locked, ops are 409, file untouched", async () => {
+  const good = fs.readFileSync(boardFile());
+  fs.writeFileSync(boardFile(), "columns: [unclosed\n  - : :");
+  const bytes = fs.readFileSync(boardFile());
+  try {
+    const res = await fetch(base() + "/api/board");
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).locked, true);
+    const add = await postOp({ op: "add", key: "PAY-9" });
+    assert.equal(add.status, 409);
+    assert.ok((await add.json()).error);
+    assert.deepEqual(fs.readFileSync(boardFile()), bytes);
+  } finally {
+    fs.writeFileSync(boardFile(), good);
+  }
 });

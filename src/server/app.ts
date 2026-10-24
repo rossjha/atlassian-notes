@@ -1,9 +1,11 @@
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
-import type { ColumnsConfig, IssueDetail, LiveEvent, Row, View } from "../shared/types.ts";
+import type { BoardOp, ColumnsConfig, IssueDetail, LiveEvent, Row, View } from "../shared/types.ts";
 import type { ViewCache } from "./cache.ts";
 import type { Config } from "./config.ts";
+import { BoardOpError } from "./board.ts";
+import type { BoardService } from "./boardService.ts";
 import { ConfigFileError, loadColumns, loadViews, saveViews, validateViews } from "./configFiles.ts";
 import { bothMarkdown, groomPrompt, ticketMarkdown } from "./copyText.ts";
 import { InvalidKeyError, isValidKey } from "./frontMatter.ts";
@@ -19,6 +21,7 @@ export interface AppDeps {
   notes: NotesStore;
   cache: ViewCache;
   refresher: Refresher;
+  board: BoardService;
   publicDir: string;
 }
 
@@ -51,7 +54,7 @@ class HttpError extends Error {
 }
 
 export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: LiveEvent) => void } {
-  const { config, jira, notes, cache, refresher } = deps;
+  const { config, jira, notes, cache, refresher, board } = deps;
   const publicDir = path.resolve(deps.publicDir);
   const clients = new Set<http.ServerResponse>();
 
@@ -139,6 +142,44 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
 
   function requireKey(key: string): void {
     if (!isValidKey(key)) throw new HttpError(400, "Invalid ticket key");
+  }
+
+  async function boardView() {
+    let customIds: string[] = [];
+    let viewIds: string[] = [];
+    try {
+      const columns = await loadColumns(config.notesDir);
+      customIds = Object.keys(columns.custom);
+      viewIds = (await loadViews(config.notesDir, columns)).map((v) => v.id);
+    } catch {
+      // serve the board without custom columns or view-sourced tickets
+    }
+    return board.view(customIds, viewIds);
+  }
+
+  function parseBoardOp(body: Record<string, unknown>): BoardOp {
+    const bad = (m: string) => new HttpError(400, m);
+    const str = (k: string): string => {
+      const v = body[k];
+      if (typeof v !== "string") throw bad(`${k} must be a string`);
+      return v;
+    };
+    switch (body.op) {
+      case "archive":
+        return { op: "archive" };
+      case "add":
+      case "remove":
+        return { op: body.op, key: str("key") };
+      case "move": {
+        const key = str("key");
+        const column = str("column");
+        const index = body.index;
+        if (typeof index !== "number" || !Number.isInteger(index) || index < 0) throw bad("index must be a non-negative integer");
+        return { op: "move", key, column, index };
+      }
+      default:
+        throw bad("Unknown board op");
+    }
   }
 
   async function api(req: http.IncomingMessage, res: http.ServerResponse, method: string, segs: string[]): Promise<void> {
@@ -259,6 +300,27 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       const body = await readJson(req);
       if (body.value !== null && typeof body.value !== "string") throw new HttpError(400, "value must be a string or null");
       return sendWrite(res, await notes.setNoteField(b, d, body.value, await jiraIdFor(b)));
+    }
+    if (a === "board" && segs.length === 1 && method === "GET") {
+      return send(res, 200, await boardView());
+    }
+    if (a === "board" && b === "ops" && segs.length === 2 && method === "POST") {
+      const op = parseBoardOp(await readJson(req));
+      try {
+        await board.apply(op);
+      } catch (err) {
+        if (err instanceof BoardOpError) return send(res, 400, { error: err.message });
+        if (err instanceof ConfigFileError) return send(res, 409, { error: err.message });
+        if (err instanceof Error && typeof (err as NodeJS.ErrnoException).code === "string") {
+          return send(res, 409, { error: `board.yaml could not be read or written: ${err.message}` });
+        }
+        throw err;
+      }
+      return send(res, 200, await boardView());
+    }
+    if (a === "board" && b === "refresh" && segs.length === 2 && method === "POST") {
+      await board.refresh();
+      return send(res, 200, await boardView());
     }
     if (a === "events" && segs.length === 1 && method === "GET") {
       res.writeHead(200, {

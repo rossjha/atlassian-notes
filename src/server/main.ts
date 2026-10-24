@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LiveEvent } from "../shared/types.ts";
 import { createApp } from "./app.ts";
+import { BoardService } from "./boardService.ts";
 import { ViewCache } from "./cache.ts";
 import { ConfigError, loadConfig, type Config } from "./config.ts";
 import { ensureDataDir, loadColumns, loadViews } from "./configFiles.ts";
@@ -72,7 +73,16 @@ async function main(): Promise<void> {
   const notes = new NotesStore(config.notesDir);
   const cache = new ViewCache(config.notesDir);
   let broadcast: (e: LiveEvent) => void = () => {};
+  const board = new BoardService({
+    jira,
+    cache,
+    notes,
+    notesDir: config.notesDir,
+    statePath: path.join(config.notesDir, ".cache", "board-state.json"),
+    onChange: (e) => broadcast(e),
+  });
   const refresher = new Refresher({
+    board,
     jira,
     cache,
     notes,
@@ -80,7 +90,7 @@ async function main(): Promise<void> {
     onChange: (e) => broadcast(e),
     statePath: path.join(config.notesDir, ".cache", "reconcile.json"),
   });
-  const app = createApp({ config, jira, notes, cache, refresher, publicDir: path.join(root, "public") });
+  const app = createApp({ config, jira, notes, cache, refresher, board, publicDir: path.join(root, "public") });
   broadcast = app.broadcast;
 
   await new Promise<void>((resolve, reject) => {
