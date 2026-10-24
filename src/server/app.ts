@@ -151,8 +151,8 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       const columns = await loadColumns(config.notesDir);
       customIds = Object.keys(columns.custom);
       viewIds = (await loadViews(config.notesDir, columns)).map((v) => v.id);
-    } catch {
-      // serve the board without custom columns or view-sourced tickets
+    } catch (err) {
+      console.warn("board: columns/views unavailable, serving board without them:", err instanceof Error ? err.message : err);
     }
     return board.view(customIds, viewIds);
   }
@@ -311,8 +311,10 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       } catch (err) {
         if (err instanceof BoardOpError) return send(res, 400, { error: err.message });
         if (err instanceof ConfigFileError) return send(res, 409, { error: err.message });
-        if (err instanceof Error && typeof (err as NodeJS.ErrnoException).code === "string") {
-          return send(res, 409, { error: `board.yaml could not be read or written: ${err.message}` });
+        const code = (err as NodeJS.ErrnoException | undefined)?.code;
+        if (err instanceof Error && typeof code === "string" && /^E[A-Z0-9]+$/.test(code) && !code.startsWith("ERR_")) {
+          console.error("board op failed:", err);
+          return send(res, 409, { error: "board.yaml could not be read or written" });
         }
         throw err;
       }

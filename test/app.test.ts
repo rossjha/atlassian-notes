@@ -334,34 +334,102 @@ test("GET /api/board on a fresh data dir returns 4 empty columns, unlocked", asy
   for (const c of body.columns) assert.deepEqual(body.cards[c], []);
 });
 
-test("board ops: add, move, and validation failures", async () => {
+const resetBoard = () => fs.rmSync(boardFile(), { force: true, recursive: true });
+
+test("board op add puts the card in Backlog and persists it", async () => {
+  resetBoard();
   const add = await postOp({ op: "add", key: "PAY-1" });
   assert.equal(add.status, 200);
-  const added = await add.json();
-  assert.equal(added.cards.Backlog[0].key, "PAY-1");
+  assert.equal((await add.json()).cards.Backlog[0].key, "PAY-1");
   assert.match(fs.readFileSync(boardFile(), "utf8"), /PAY-1/);
+});
 
+test("board op move puts the card in the target column", async () => {
+  resetBoard();
+  await postOp({ op: "add", key: "PAY-1" });
   const move = await postOp({ op: "move", key: "PAY-1", column: "Doing", index: 0 });
   assert.equal(move.status, 200);
   const moved = await move.json();
   assert.equal(moved.cards.Doing[0].key, "PAY-1");
   assert.deepEqual(moved.cards.Backlog, []);
-
-  assert.equal((await postOp({ op: "move", key: "PAY-1", column: "Nope", index: 0 })).status, 400);
-  assert.equal((await postOp({ op: "add", key: "../x" })).status, 400);
-  assert.equal((await postOp({ op: "explode" })).status, 400);
-  assert.equal((await postOp({ op: "move", key: "PAY-1", column: "Doing", index: -1 })).status, 400);
-  assert.equal((await postOp({ op: "move", key: "PAY-1", column: "Doing", index: 1.5 })).status, 400);
-  assert.equal((await postOp({ op: "add", key: 5 })).status, 400);
-  assert.equal((await postOp({ op: "move", key: "PAY-1", column: 7, index: 0 })).status, 400);
 });
 
-test("POST /api/board/refresh returns the board", async () => {
+test("board ops reject bad shapes and semantics with 400", async () => {
+  resetBoard();
+  await postOp({ op: "add", key: "PAY-1" });
+  const bad: unknown[] = [
+    { op: "move", key: "PAY-1", column: "Nope", index: 0 },
+    { op: "add", key: "../x" },
+    { op: "explode" },
+    { op: "move", key: "PAY-1", column: "Doing", index: -1 },
+    { op: "move", key: "PAY-1", column: "Doing", index: 1.5 },
+    { op: "add", key: 5 },
+    { op: "move", key: "PAY-1", column: 7, index: 0 },
+  ];
+  for (const b of bad) assert.equal((await postOp(b)).status, 400, JSON.stringify(b));
+});
+
+test("POST /api/board/refresh returns the board with ticket rows", async () => {
+  resetBoard();
+  await postOp({ op: "add", key: "PAY-1" });
   const res = await fetch(base() + "/api/board/refresh", { method: "POST", headers: J });
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.equal(body.cards.Doing[0].key, "PAY-1");
-  assert.equal(body.cards.Doing[0].row.ticket.key, "PAY-1");
+  assert.equal(body.cards.Backlog[0].row.ticket.key, "PAY-1");
+});
+
+test("cross-origin POST /api/board/ops is 403", async () => {
+  const res = await postOp({ op: "archive" }, { ...J, Origin: "https://evil.example" });
+  assert.equal(res.status, 403);
+});
+
+test("GET /api/board survives corrupted views.yaml and columns.yaml", async () => {
+  resetBoard();
+  const warn = console.warn;
+  console.warn = () => {};
+  const files = ["views.yaml", "columns.yaml"].map((f) => path.join(dir, f));
+  const saved = files.map((f) => fs.readFileSync(f));
+  try {
+    for (const f of files) fs.writeFileSync(f, "a: [unclosed\n  - : :");
+    const res = await fetch(base() + "/api/board");
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).locked, false);
+  } finally {
+    console.warn = warn;
+    files.forEach((f, i) => fs.writeFileSync(f, saved[i]));
+  }
+});
+
+test("fs error during an op is 409 with a fixed message and no path", async () => {
+  resetBoard();
+  fs.mkdirSync(boardFile());
+  const err = console.error;
+  console.error = () => {};
+  try {
+    const res = await postOp({ op: "add", key: "PAY-9" });
+    assert.equal(res.status, 409);
+    const text = await res.text();
+    assert.equal(JSON.parse(text).error, "board.yaml could not be read or written");
+    assert.ok(!text.includes("/"));
+  } finally {
+    console.error = err;
+    resetBoard();
+  }
+});
+
+test("non-fs error with a code stays a 500", async () => {
+  const orig = boardRef.apply;
+  const err = console.error;
+  console.error = () => {};
+  boardRef.apply = async () => { throw Object.assign(new Error("boom"), { code: "ERR_X" }); };
+  try {
+    const res = await postOp({ op: "archive" });
+    assert.equal(res.status, 500);
+    assert.equal((await res.json()).error, "Internal error");
+  } finally {
+    boardRef.apply = orig;
+    console.error = err;
+  }
 });
 
 test("board ops enforce the Content-Type gate", async () => {
@@ -369,6 +437,8 @@ test("board ops enforce the Content-Type gate", async () => {
 });
 
 test("corrupted board.yaml: GET is locked, ops are 409, file untouched", async () => {
+  resetBoard();
+  await postOp({ op: "add", key: "PAY-1" });
   const good = fs.readFileSync(boardFile());
   fs.writeFileSync(boardFile(), "columns: [unclosed\n  - : :");
   const bytes = fs.readFileSync(boardFile());
