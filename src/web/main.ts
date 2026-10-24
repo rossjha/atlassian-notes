@@ -340,7 +340,7 @@ function selectTab(id: string): void {
   };
   if (id === BOARD_TAB) {
     rowsSeq++; // supersede any in-flight rows fetch
-    withPageTransition(dir, paint);
+    withPageTransition(dir, paint, [headerEl, filterEl, tableEl]);
     void loadBoard();
     return;
   }
@@ -349,7 +349,7 @@ function selectTab(id: string): void {
   fetchedAt = null;
   rowsError = null;
   rowsLoaded = false;
-  withPageTransition(dir, paint);
+  withPageTransition(dir, paint, [headerEl, filterEl, tableEl]);
   void loadRows();
 }
 

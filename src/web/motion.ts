@@ -24,15 +24,38 @@ export function motionMs(token: string, fallback: number): number {
 type StartViewTransition = (update: () => void) => unknown;
 
 /**
- * Runs `update` (synchronous DOM work) inside a view transition when the browser supports it and motion is allowed;
- * otherwise runs it at once. `dir` lands on <html data-nav-dir> for the page-slide CSS.
+ * Runs `update` (synchronous DOM work) inside a view transition when the browser supports it and motion is allowed.
+ * `dir` lands on <html data-nav-dir> for the page-slide CSS. Browsers without view transitions (Firefox before 144)
+ * get the same look from the Web Animations API: `pageEls` slide in from the side, and the tab underline glides from
+ * where it was (FLIP). Element.animate() is not an inline style attribute, so CSP is unaffected.
  */
-export function withPageTransition(dir: NavDir | null, update: () => void): void {
+export function withPageTransition(dir: NavDir | null, update: () => void, pageEls: HTMLElement[] = []): void {
   const start = (document as { startViewTransition?: StartViewTransition }).startViewTransition;
-  if (!dir || typeof start !== "function" || !motionAllowed()) {
+  if (!dir || !motionAllowed()) {
     update();
     return;
   }
-  document.documentElement.dataset.navDir = dir;
-  start.call(document, update);
+  if (typeof start === "function") {
+    document.documentElement.dataset.navDir = dir;
+    start.call(document, update);
+    return;
+  }
+  const before = document.querySelector<HTMLElement>(".tab-indicator")?.getBoundingClientRect();
+  update();
+  const easing = getComputedStyle(document.documentElement).getPropertyValue("--motion-ease").trim() || "ease-out";
+  const enter = motionMs("--motion-enter", 360);
+  const from = dir === "forward" ? "32px 0" : "-32px 0";
+  for (const el of pageEls) {
+    if (el.isConnected && !el.hidden) el.animate([{ opacity: 0, translate: from }, { opacity: 1, translate: "0 0" }], { duration: enter, easing });
+  }
+  const indicator = document.querySelector<HTMLElement>(".tab-indicator");
+  const after = indicator?.getBoundingClientRect();
+  if (indicator && before && after && after.width > 0) {
+    const dx = before.left - after.left;
+    const sx = before.width / after.width;
+    indicator.animate(
+      [{ transformOrigin: "left center", transform: `translateX(${dx}px) scaleX(${sx})` }, { transformOrigin: "left center", transform: "none" }],
+      { duration: motionMs("--motion-page", 480), easing },
+    );
+  }
 }
