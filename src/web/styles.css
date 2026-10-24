@@ -22,16 +22,17 @@
   --shadow: 0 8px 24px rgb(0 0 0 / 0.4); /* shadows stay black in every theme */
 }
 
+/* The dot pattern lives on <html> so it fills the whole window, not just the height of the content. */
 html {
-  background: var(--bg);
+  min-height: 100%;
+  background-color: var(--bg);
+  background-image: var(--page-pattern);
+  background-size: 20px 20px;
   scrollbar-width: thin;
   scrollbar-color: var(--dim) transparent;
 }
 
 body {
-  background-color: var(--bg);
-  background-image: var(--page-pattern);
-  background-size: 20px 20px;
   color: var(--fg);
   font: 13px/1.4 var(--font);
   margin: 0;
