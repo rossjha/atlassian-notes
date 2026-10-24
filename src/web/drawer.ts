@@ -10,8 +10,8 @@ export interface DrawerHooks {
   onNoteSaved(): void;
   /** Present when the personal board is available. `disabled` is read live, on every render and sync. */
   star?: { isStarred(key: string): boolean; toggle(key: string): void; readonly disabled: boolean; readonly locked?: boolean };
-  /** A note with text was saved in a drawer that was opened from the header search. */
-  onNoteSavedFromSearch?(key: string, body: string): void;
+  /** A note was saved in the drawer. `openedFromSearch` is captured when the editor opened. */
+  onNoteSavedInDrawer?(key: string, body: string, openedFromSearch: boolean): void;
 }
 
 let hooks: DrawerHooks = { getRow: () => undefined, onNoteSaved: () => {} };
@@ -221,11 +221,11 @@ function noteSection(key: string, row: Row | null): HTMLElement {
     cell.addEventListener("click", (e) => {
       if (cell.querySelector(".editor-wrap") || (e.target as Element).closest("a,button")) return;
       const before = row.note; // editNote assigns a new object on a successful save
+      // Captured now: closing the drawer while a blur-triggered save is in flight resets `fromSearch`.
+      const openedFromSearch = fromSearch;
       editNote(cell, row, () => {
         hooks.onNoteSaved();
-        if (fromSearch && row.note && row.note !== before && row.note.body.trim() !== "") {
-          hooks.onNoteSavedFromSearch?.(key, row.note.body);
-        }
+        if (row.note && row.note !== before) hooks.onNoteSavedInDrawer?.(key, row.note.body, openedFromSearch);
         diskNotice = false;
         renderNotice();
         show(true); // until the refetch below brings the rendered HTML

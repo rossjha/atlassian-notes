@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyOpLocal } from "../src/shared/boardOps.ts";
+import { applyOpLocal, shouldAutoMove } from "../src/shared/boardOps.ts";
 import { applyBoardOp } from "../src/server/board.ts";
 import type { BoardFile, BoardOp, BoardResponse } from "../src/shared/types.ts";
 
@@ -45,4 +45,15 @@ test("applyOpLocal clamps an index of MAX_SAFE_INTEGER to the end, like the serv
   const op: BoardOp = { op: "move", key: "X-1", column: "B", index: Number.MAX_SAFE_INTEGER };
   assert.deepEqual(keys(applyOpLocal(resp, op)).B, ["X-4", "X-5", "X-1"]);
   assert.deepEqual(applyBoardOp(file, op).cards.B, ["X-4", "X-5", "X-1"]);
+});
+
+test("shouldAutoMove: only a search-opened, non-empty note for an off-board ticket on a ready, unlocked board with a note column", () => {
+  const base = { openedFromSearch: true, onBoard: false, ready: true, locked: false, body: "hi", noteColumn: "Doing" as string | undefined };
+  assert.equal(shouldAutoMove(base), true);
+  assert.equal(shouldAutoMove({ ...base, openedFromSearch: false }), false);
+  assert.equal(shouldAutoMove({ ...base, onBoard: true }), false);
+  assert.equal(shouldAutoMove({ ...base, ready: false }), false);
+  assert.equal(shouldAutoMove({ ...base, locked: true }), false);
+  assert.equal(shouldAutoMove({ ...base, body: "  \n" }), false);
+  assert.equal(shouldAutoMove({ ...base, noteColumn: undefined }), false);
 });

@@ -1,7 +1,7 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
-import { applyOpLocal } from "../shared/boardOps.ts";
+import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
 import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
 import { h, relativeTime } from "./dom.ts";
 import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer } from "./drawer.ts";
@@ -96,7 +96,7 @@ configureDrawer({
       return boardReady && boardLocked;
     },
   },
-  onNoteSavedFromSearch: noteImpliesDoing,
+  onNoteSavedInDrawer: noteImpliesDoing,
 });
 function boardRow(key: string): Row | undefined {
   if (!boardData) return undefined;
@@ -440,10 +440,10 @@ function toggleStar(key: string): void {
 }
 
 /** A note was saved from a search-opened drawer: a ticket that isn't on the board goes to the note column. */
-function noteImpliesDoing(key: string, body: string): void {
-  if (body.trim() === "" || !boardReady || boardLocked || !boardData || boardKeys.has(key)) return;
+function noteImpliesDoing(key: string, body: string, openedFromSearch: boolean): void {
+  if (!boardData) return;
   const column = boardData.noteColumn;
-  if (!column) return;
+  if (!shouldAutoMove({ openedFromSearch, onBoard: boardKeys.has(key), ready: boardReady, locked: boardLocked, body, noteColumn: column })) return;
   boardKeys = new Set(boardKeys).add(key);
   submitBoardOp({ op: "move", key, column, index: Number.MAX_SAFE_INTEGER }, () => {
     boardKeys = new Set(boardKeys);

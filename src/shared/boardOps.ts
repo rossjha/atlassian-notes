@@ -37,3 +37,19 @@ export function applyOpLocal(data: BoardResponse, op: BoardOp): BoardResponse {
   return { ...data, cards };
 }
 
+
+/**
+ * Whether a saved note should put its ticket in the board's note column (ruling P3: only for
+ * drawers opened from the header search). `openedFromSearch` is captured when the editor opens,
+ * so closing the drawer while the save is in flight doesn't cancel the move.
+ */
+export function shouldAutoMove(s: {
+  openedFromSearch: boolean;
+  onBoard: boolean;
+  ready: boolean;
+  locked: boolean;
+  body: string;
+  noteColumn: string | undefined;
+}): boolean {
+  return s.openedFromSearch && !s.onBoard && s.ready && !s.locked && s.body.trim() !== "" && !!s.noteColumn;
+}
