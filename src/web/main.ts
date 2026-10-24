@@ -339,7 +339,7 @@ function renderChrome(): void {
       ),
     ),
   );
-  if (!locked) tabsListEl.append(h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"));
+  if (!locked) tabsListEl.append(h("button", { type: "button", class: "icon-btn tab-add", title: "Add view", "aria-label": "Add view", onclick: () => editView(null) }, icon("plusCircle", "icon-btn-svg")));
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {

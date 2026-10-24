@@ -128,7 +128,7 @@ body {
   .confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
   .btn-danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
   .btn-danger:hover { background: #991b1b; }
-  .tab-add { color: var(--accent); }
+  .tab-add { align-self: center; }
 
   .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; }
   .fb-wrap { position: relative; display: inline-block; }
