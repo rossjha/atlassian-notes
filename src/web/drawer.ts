@@ -1,10 +1,11 @@
-import type { Row } from "../shared/types.ts";
+import type { Row, Ticket } from "../shared/types.ts";
 import { icon } from "./icons.ts";
 import { isMenuOpen, menuButton } from "./viewMenu.ts";
 import { api, type CopyKind, type TicketResponse } from "./api.ts";
-import { copyToClipboard, h, setHtml } from "./dom.ts";
+import { copyToClipboard, h, relativeTime, setHtml } from "./dom.ts";
 import { editNote, isEditing } from "./editors.ts";
 import { motionAllowed, motionMs } from "./motion.ts";
+import { groupLinks, sprintLabel } from "./ticketDetails.ts";
 
 export interface DrawerHooks {
   /** The current table row for a key, if it is in the active view. */
@@ -260,6 +261,31 @@ function htmlBox(html: string, empty: string): HTMLElement {
   return box;
 }
 
+/** A ticket key that opens in this drawer (Jira itself stays one click away via Open). */
+function keyLink(key: string, summary?: string): HTMLElement {
+  return h("button", { type: "button", class: "dr-keylink", title: summary ? `${key} · ${summary}` : `Open ${key}`, onclick: () => openDrawer(key) },
+    h("code", { class: "key" }, key), summary ? h("span", { class: "dr-keylink-text" }, summary) : null);
+}
+
+function detailsSection(t: Ticket): HTMLElement {
+  const none = () => h("span", { class: "text-muted" }, "—");
+  const field = (label: string, value: string | HTMLElement | null) =>
+    [h("dt", {}, label), h("dd", {}, value === null || value === "" ? none() : value)];
+  const links = groupLinks(t);
+  const sprint = sprintLabel(t);
+  return section("Details", h("dl", { class: "dr-details" },
+    ...field("Type", t.type),
+    ...field("Priority", t.priority),
+    ...field("Assignee", t.assignee ?? h("span", { class: "text-muted" }, "Unassigned")),
+    ...field("Reporter", t.reporter),
+    ...field("Parent", t.parent ? keyLink(t.parent.key, t.parent.summary) : null),
+    ...field("Sprint", sprint),
+    ...field("Labels", t.labels.length ? h("span", { class: "dr-labels" }, ...t.labels.map((l) => h("span", { class: "pill" }, l))) : null),
+    ...field("Updated", t.updated ? h("span", { title: t.updated }, relativeTime(t.updated)) : null),
+    ...links.flatMap((g) => field(g.phrase.charAt(0).toUpperCase() + g.phrase.slice(1), h("span", { class: "dr-labels" }, ...g.keys.map((k) => keyLink(k))))),
+  ));
+}
+
 function noteSection(key: string, row: Row | null): HTMLElement {
   const cell = h("div", { class: "dr-note" });
   const show = (plainOnly: boolean): void => {
@@ -335,6 +361,7 @@ function render(): void {
   );
 
   const left = h("div", { class: "dr-col" });
+  if (t) left.append(detailsSection(t));
   if (payload) {
     left.append(section("Description", htmlBox(payload.html.description, "No description.")));
     if (payload.html.acceptanceCriteria.trim()) left.append(section("Acceptance criteria", htmlBox(payload.html.acceptanceCriteria, "")));

@@ -320,6 +320,13 @@ body {
   .dr-body { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 0.75rem 1rem; align-items: start; }
   .dr-col { min-width: 0; }
   .dr-h { font-size: 11px; text-transform: uppercase; letter-spacing: var(--label-tracking); color: var(--muted); margin: 0.5rem 0 0.3rem; font-weight: 600; }
+  .dr-details { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 0.5rem; font-size: 12px; }
+  .dr-details dt { color: var(--muted); }
+  .dr-details dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .dr-labels { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .dr-keylink { display: inline-flex; gap: 0.4rem; align-items: baseline; max-width: 100%; padding: 0; border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+  .dr-keylink:hover .dr-keylink-text, .dr-keylink:hover .key { color: var(--accent); }
+  .dr-keylink-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dr-prose { overflow-wrap: anywhere; }
   .dr-plain { white-space: pre-wrap; }
   .dr-prose p { margin: 0 0 0.5rem; }
