@@ -1,7 +1,8 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
-import { applyOpLocal, isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
+import { applyOpLocal } from "../shared/boardOps.ts";
+import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
 import { h, relativeTime } from "./dom.ts";
 import { configureDrawer, drawerOnLive, openDrawer } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
@@ -27,7 +28,7 @@ let rowsLoaded = false;
 let jqlEditor: { viewId: string; el: HTMLTextAreaElement } | null = null;
 let boardKeys = new Set<string>();
 let boardData: BoardResponse | null = null;
-let boardLoadError: string | null = null;
+let boardError: string | null = null; // board load/refresh failures; cleared when a board is applied
 let boardRefreshing = false;
 let boardReady = false; // true once GET /api/board has succeeded
 let boardLocked = false; // board.yaml is broken (server-reported)
@@ -312,7 +313,7 @@ function renderChrome(): void {
     h("div", { class: "text-muted" }, "Notes whose ticket is no longer found in Jira. The files are left untouched."),
     ...orphans.map((o) => h("div", { class: "orphan-row" }, h("code", { class: "key" }, o.key), h("code", { class: "text-muted" }, o.notePath), h("code", { class: "text-muted" }, o.groomPath))),
   );
-  const err = (onBoard ? [boardData?.error ?? boardLoadError, saveError] : [configError ?? rowsError, saveError]).filter(Boolean).join("\n");
+  const err = (onBoard ? [boardData?.error, boardError, opError ? saveError : null] : [configError ?? rowsError, saveError]).filter(Boolean).join("\n");
   errorEl.textContent = err;
   errorEl.hidden = !err;
 }
@@ -327,7 +328,7 @@ onDragIdle(() => {
 
 function applyBoard(b: BoardResponse): void {
   boardData = b;
-  boardLoadError = null;
+  boardError = null;
   boardKeys = new Set(Object.values(b.cards).flatMap((cs) => cs.map((c) => c.key)));
   boardLocked = b.locked;
   boardReady = true;
@@ -345,7 +346,7 @@ async function loadBoard(): Promise<void> {
   } catch (e) {
     if (stale()) return;
     boardReady = false; // errors surface on the board tab
-    boardLoadError = (e as Error).message;
+    boardError = (e as Error).message;
   }
   renderChrome();
   renderBody();
@@ -403,15 +404,17 @@ function boardOp(op: BoardOp): void {
 async function refreshBoard(): Promise<void> {
   if (boardRefreshing) return;
   boardRefreshing = true;
+  const ops = opSeq;
   renderChrome();
   renderBody();
   try {
     const b = await api.refreshBoard();
-    boardSeq++; // supersede any in-flight load
-    if (pendingOps === 0) applyBoard(b);
+    if (ops === opSeq && pendingOps === 0) {
+      boardSeq++; // supersede any in-flight load
+      applyBoard(b);
+    }
   } catch (e) {
-    saveError = (e as Error).message;
-    opError = true;
+    boardError = (e as Error).message;
   } finally {
     boardRefreshing = false;
     renderChrome();
@@ -425,6 +428,7 @@ const boardHandlers: BoardHandlers = {
   onNoteSaved: () => void loadBoard(),
   onRefresh: () => void refreshBoard(),
   refreshing: false,
+  archiveCount: () => (boardData ? (boardData.cards[boardData.archiveColumn] ?? []).length : 0),
 };
 
 function renderBody(): void {
@@ -438,7 +442,14 @@ function renderBody(): void {
     filterEl.replaceChildren();
     filterEl.hidden = true;
     if (boardData) renderBoard(tableEl, boardData, { ...boardHandlers, refreshing: boardRefreshing });
-    else tableEl.replaceChildren(h("p", { class: "empty-state" }, boardLoadError ? "" : "Loading board…"));
+    else {
+      const refresh = h("button", { type: "button", class: "btn", onclick: () => void refreshBoard() }, boardRefreshing ? "Refreshing…" : "Refresh");
+      if (boardRefreshing) refresh.setAttribute("disabled", "");
+      tableEl.replaceChildren(
+        h("div", { class: "view-header board-header" }, h("span", { class: "text-muted last-refreshed" }, "Last refreshed never"), refresh),
+        h("p", { class: "empty-state" }, boardError ? "" : "Loading board…"),
+      );
+    }
     return;
   }
   filterEl.hidden = false;

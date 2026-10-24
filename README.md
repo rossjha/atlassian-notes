@@ -72,15 +72,15 @@ The **★ My board** tab is a personal kanban for tickets you want to come back 
 - **Notes:** click a card's note box (or "+ add note") to edit the same note that the table and ticket panel use.
 - **Columns:** they come from `board.yaml` in your notes folder, created from `examples/board.example.yaml` on first run. Edit the file to add, rename or reorder columns; the board updates live.
 
-```yaml
-columns: [Backlog, Doing, PEN, Done]
-archiveColumn: Done
-cards:                  # written by the app; order in a list = order on the board
-  Backlog: []
-  Doing: [PAY-412]
-```
+  ```yaml
+  columns: [Backlog, Doing, PEN, Done]
+  archiveColumn: Done
+  cards:                  # written by the app; order in a list = order on the board
+    Backlog: []
+    Doing: [PAY-412]
+  ```
 
-A card under an unknown column goes to the first column, and a repeated key is kept once. If `board.yaml` can't be parsed, the board shows the error and its controls (and the table stars) are disabled until you fix the file; the app never rewrites a file it couldn't read.
+  A card under an unknown column goes to the first column, and a repeated key is kept once. If `board.yaml` can't be parsed, the board shows the error and its controls (and the table stars) are disabled until you fix the file; the app never rewrites a file it couldn't read.
 - **Archive:** the `archiveColumn` lane has an **Archive all** button (click it, then click "Archive N cards?" within 4 seconds). It only takes those cards off the board, like un-starring them. Your notes are kept.
 - **Refresh:** the board fetches its tickets from Jira by key, independently of your JQL views. A ticket Jira can't find (deleted, or no permission) shows as "not found in Jira" and the rest of the board still loads.
 

@@ -1,3 +1,4 @@
+import { locate } from "../shared/boardOps.ts";
 import type { BoardCard, BoardOp, BoardResponse, Row } from "../shared/types.ts";
 import { h, relativeTime } from "./dom.ts";
 import { editNote, isEditing } from "./editors.ts";
@@ -8,6 +9,8 @@ export interface BoardHandlers {
   onNoteSaved(): void;
   onRefresh(): void;
   refreshing: boolean;
+  /** Current number of cards in the archive column (latest board data), checked when the archive click is confirmed. */
+  archiveCount?(): number;
 }
 
 const ARCHIVE_CONFIRM_MS = 4000;
@@ -29,43 +32,6 @@ export function onDragIdle(cb: () => void): void {
 
 function archiveLabel(count: number, isArmed: boolean): string {
   return isArmed ? `Archive ${count} ${count === 1 ? "card" : "cards"}?` : "Archive all";
-}
-
-function locate(data: BoardResponse, key: string): { column: string; index: number } | null {
-  for (const column of data.columns) {
-    const index = (data.cards[column] ?? []).findIndex((c) => c.key === key);
-    if (index >= 0) return { column, index };
-  }
-  return null;
-}
-
-/**
- * Applies an operation to a board snapshot the way the server will (used for optimistic updates).
- * `move.index` is a position in the destination list without the moved key.
- */
-export function applyOpLocal(data: BoardResponse, op: BoardOp): BoardResponse {
-  const cards: Record<string, BoardCard[]> = {};
-  for (const c of data.columns) cards[c] = [...(data.cards[c] ?? [])];
-  switch (op.op) {
-    case "add":
-      break; // needs ticket data; the server response supplies it
-    case "remove":
-      for (const c of data.columns) cards[c] = cards[c]!.filter((x) => x.key !== op.key);
-      break;
-    case "archive":
-      cards[data.archiveColumn] = [];
-      break;
-    case "move": {
-      const from = locate(data, op.key);
-      const dest = cards[op.column];
-      if (!from || !dest) break;
-      const [card] = cards[from.column]!.splice(from.index, 1);
-      const target = from.column === op.column ? cards[from.column]! : dest;
-      target.splice(Math.max(0, Math.min(op.index, target.length)), 0, card!);
-      break;
-    }
-  }
-  return { ...data, cards };
 }
 
 function findCardEl(container: HTMLElement, key: string): HTMLElement | null {
@@ -94,7 +60,6 @@ function cardEl(
 
   const row: Row | null = card.row;
   if (!row) {
-    el.classList.add("card-empty");
     el.append(
       h("div", { class: "card-line" }, h("span", { class: "key" }, card.key), remove),
       h("div", { class: "text-muted" }, card.missing ? "not found in Jira" : "loading…"),
@@ -106,13 +71,23 @@ function cardEl(
       row.groom?.readiness ? h("span", { class: "pill groom-readiness" }, row.groom.readiness) : null,
       row.flags.jiraNewerThanNote ? h("span", { class: "stale-dot card-stale", title: "Jira changed after this note was last edited" }) : null,
     );
-    const note = h("div", { class: `card-note${row.note?.body ? "" : " card-note-empty"}` }, row.note?.body ? row.note.body : "+ add note");
+    const note = h("div", { class: "card-note" });
+    const paintNote = (): void => {
+      note.classList.remove("card-note-editing");
+      note.classList.toggle("card-note-empty", !row.note?.body);
+      note.replaceChildren(row.note?.body ? row.note.body : "+ add note");
+    };
+    paintNote();
     if (!disabled) {
       note.addEventListener("click", () => {
         if (note.querySelector(".editor-wrap")) return;
         el.draggable = false; // a textarea inside a draggable card can't select text in Firefox
         note.classList.add("card-note-editing");
-        editNote(note, row, () => handlers.onNoteSaved(), { rows: 4 });
+        editNote(note, row, () => {
+          el.draggable = true;
+          paintNote(); // the editor leaves its textarea behind if no re-render follows
+          handlers.onNoteSaved();
+        }, { rows: 4 });
       });
     }
     el.append(
@@ -126,6 +101,12 @@ function cardEl(
     );
   }
 
+  el.addEventListener("keydown", (e) => {
+    if (e.target === el && e.key === "Enter" && !e.altKey) {
+      e.preventDefault();
+      handlers.onOpen(card.key);
+    }
+  });
   if (!disabled) {
     el.draggable = true;
     el.addEventListener("dragstart", (e) => {
@@ -142,18 +123,14 @@ function cardEl(
     el.addEventListener("dragend", () => {
       el.classList.remove("card-dragging");
       dragKey = null;
-      for (const m of document.querySelectorAll(".board-drop")) m.remove();
+      for (const m of document.querySelectorAll<HTMLElement>(".board-drop")) m.hidden = true;
+      for (const l of document.querySelectorAll(".board-lane-over")) l.classList.remove("board-lane-over");
       dragIdleListener?.();
     });
     el.addEventListener("keydown", (e) => {
       if (e.target !== el) return;
       const here = locate(data, card.key);
       if (!here) return;
-      if (e.key === "Enter" && !e.altKey) {
-        e.preventDefault();
-        handlers.onOpen(card.key);
-        return;
-      }
       if (!e.altKey) return;
       const colIdx = data.columns.indexOf(column);
       const len = (data.cards[column] ?? []).length;
@@ -210,12 +187,19 @@ function laneEl(column: string, data: BoardResponse, handlers: BoardHandlers, di
       armed = null;
     }
     const btn = h("button", { type: "button", class: "btn board-archive" }, archiveLabel(cards.length, armed !== null));
-    if (armed) btn.classList.add("armed");
+    if (armed) btn.classList.add("board-archive-armed");
     if (disabled) btn.setAttribute("disabled", "");
     btn.addEventListener("click", () => {
       if (armed) {
         clearTimeout(armed.timer);
+        const expected = armed.count;
         armed = null;
+        if ((handlers.archiveCount?.() ?? expected) !== expected) {
+          // the archive column changed since arming: ask again with the new count
+          btn.textContent = archiveLabel(cards.length, false);
+          btn.classList.remove("board-archive-armed");
+          return;
+        }
         handlers.onOp({ op: "archive" });
         return;
       }
@@ -226,12 +210,12 @@ function laneEl(column: string, data: BoardResponse, handlers: BoardHandlers, di
           armed = null;
           if (archiveBtn) {
             archiveBtn.textContent = archiveLabel(count, false);
-            archiveBtn.classList.remove("armed");
+            archiveBtn.classList.remove("board-archive-armed");
           }
         }, ARCHIVE_CONFIRM_MS),
       };
       btn.textContent = archiveLabel(count, true);
-      btn.classList.add("armed");
+      btn.classList.add("board-archive-armed");
     });
     archiveBtn = btn;
     head.append(btn);
@@ -240,7 +224,7 @@ function laneEl(column: string, data: BoardResponse, handlers: BoardHandlers, di
     armed = null;
   }
 
-  const lane = h("section", { class: "board-lane", "aria-label": column }, head, list);
+  const lane = h("section", { class: "board-lane", "aria-label": column, tabindex: "-1" }, head, list);
   if (!disabled) {
     lane.addEventListener("dragover", (e) => {
       if (dragKey === null) return;
@@ -271,11 +255,45 @@ function laneEl(column: string, data: BoardResponse, handlers: BoardHandlers, di
   return lane;
 }
 
+interface FocusSpot {
+  key: string;
+  control: "card" | "title" | "x";
+  lane: string | null;
+  index: number;
+}
+
+function focusSpot(container: HTMLElement): FocusSpot | null {
+  const active = document.activeElement as HTMLElement | null;
+  if (!active || !container.contains(active)) return null;
+  const card = active.closest<HTMLElement>("[data-card-key]");
+  if (!card) return null;
+  const lane = card.closest<HTMLElement>(".board-lane");
+  const siblings = lane ? [...lane.querySelectorAll<HTMLElement>("[data-card-key]")] : [];
+  return {
+    key: card.getAttribute("data-card-key")!,
+    control: active === card ? "card" : active.classList.contains("card-x") ? "x" : active.classList.contains("card-title") ? "title" : "card",
+    lane: lane?.getAttribute("aria-label") ?? null,
+    index: siblings.indexOf(card),
+  };
+}
+
+function restoreFocus(container: HTMLElement, spot: FocusSpot): void {
+  const card = findCardEl(container, spot.key);
+  if (card) {
+    const target = spot.control === "card" ? card : card.querySelector<HTMLElement>(spot.control === "x" ? ".card-x" : ".card-title");
+    (target && !target.hasAttribute("disabled") ? target : card).focus();
+    return;
+  }
+  // The card is gone (removed or archived): focus its neighbour in the same lane, else the lane.
+  const lane = [...container.querySelectorAll<HTMLElement>(".board-lane")].find((l) => l.getAttribute("aria-label") === spot.lane);
+  if (!lane) return;
+  const cards = [...lane.querySelectorAll<HTMLElement>("[data-card-key]")];
+  (cards[Math.min(spot.index, cards.length - 1)] ?? lane).focus();
+}
+
 export function renderBoard(container: HTMLElement, data: BoardResponse, handlers: BoardHandlers): void {
   const disabled = data.locked;
-  const focusedKey = container.contains(document.activeElement)
-    ? (document.activeElement as HTMLElement).closest("[data-card-key]")?.getAttribute("data-card-key") ?? null
-    : null;
+  const spot = focusSpot(container);
   archiveBtn = null;
 
   const refresh = h("button", { type: "button", class: "btn", onclick: () => handlers.onRefresh() }, handlers.refreshing ? "Refreshing…" : "Refresh");
@@ -287,5 +305,5 @@ export function renderBoard(container: HTMLElement, data: BoardResponse, handler
   const lanes = h("div", { class: "board-lanes" }, ...data.columns.map((c) => laneEl(c, data, handlers, disabled)));
   container.replaceChildren(header, lanes);
 
-  if (focusedKey) findCardEl(container, focusedKey)?.focus();
+  if (spot) restoreFocus(container, spot);
 }
