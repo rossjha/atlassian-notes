@@ -20,6 +20,8 @@ let fetchedAt: string | null = null;
 let rowsError: string | null = null;
 let saveError: string | null = null;
 let rowsLoaded = false;
+// Inline JQL editor in the view header; kept across renderChrome() so typing survives re-renders.
+let jqlEditor: { viewId: string; el: HTMLTextAreaElement } | null = null;
 const refreshingIds = new Set<string>();
 let rowsSeq = 0;
 let sort: SortState | null = null;
@@ -161,7 +163,61 @@ function editView(view: View | null): void {
   );
 }
 
+function startJqlEdit(view: View): void {
+  if (viewsLocked()) return;
+  const el = h("textarea", { class: "jql jql-edit", rows: "1", spellcheck: "false", "aria-label": `JQL for ${view.name}` }) as HTMLTextAreaElement;
+  el.value = view.jql;
+  const fit = () => {
+    el.style.setProperty("height", "auto");
+    el.style.setProperty("height", `${el.scrollHeight}px`);
+  };
+  el.addEventListener("input", fit);
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelJqlEdit();
+    } else if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void commitJqlEdit();
+    }
+  });
+  jqlEditor = { viewId: view.id, el };
+  renderChrome();
+  fit();
+  el.focus();
+  el.setSelectionRange(el.value.length, el.value.length);
+}
+
+function cancelJqlEdit(): void {
+  jqlEditor = null;
+  renderChrome();
+}
+
+async function commitJqlEdit(): Promise<void> {
+  if (!jqlEditor) return;
+  const { viewId, el } = jqlEditor;
+  const view = views.find((v) => v.id === viewId);
+  const jql = el.value.trim();
+  if (!view || jql === view.jql) return cancelJqlEdit();
+  if (jql === "") {
+    saveError = "JQL can't be empty.";
+    return renderChrome();
+  }
+  el.disabled = true;
+  try {
+    await saveEditedView({ ...view, jql }, false); // saves views.yaml and refreshes the view
+    saveError = null;
+    jqlEditor = null;
+  } catch (e) {
+    saveError = (e as Error).message;
+    el.disabled = false;
+  }
+  renderChrome();
+  if (jqlEditor) el.focus();
+}
+
 function selectTab(id: string): void {
+  if (jqlEditor && jqlEditor.viewId !== id) jqlEditor = null;
   activeId = id;
   remember(id);
   sort = null;
@@ -176,6 +232,7 @@ function selectTab(id: string): void {
 
 function renderChrome(): void {
   const locked = viewsLocked();
+  const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
   tabsEl.replaceChildren(
     ...views.map((v) =>
       h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
@@ -191,11 +248,18 @@ function renderChrome(): void {
     const busy = refreshingIds.has(view.id);
     const refresh = h("button", { type: "button", class: "btn", onclick: () => void doRefresh() }, busy ? "Refreshing…" : "Refresh");
     if (busy) refresh.setAttribute("disabled", "");
+    if (jqlEditor && (locked || jqlEditor.viewId !== view.id)) jqlEditor = null;
+    const jql = jqlEditor
+      ? jqlEditor.el
+      : locked
+        ? h("code", { class: "jql" }, view.jql)
+        : h("button", { type: "button", class: "jql jql-btn", title: "Click to edit JQL (Enter saves, Esc cancels)", onclick: () => startJqlEdit(view) }, view.jql);
     headerEl.append(
-      h("code", { class: "jql" }, view.jql),
+      jql,
       h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(fetchedAt)}`),
       refresh,
     );
+    if (jqlHadFocus && jqlEditor) jqlEditor.el.focus();
   }
   if (orphans.length > 0) {
     headerEl.append(h("button", {
