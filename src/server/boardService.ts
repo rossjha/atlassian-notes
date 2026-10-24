@@ -221,7 +221,12 @@ export class BoardService {
     try {
       board = await loadBoard(notesDir);
     } catch (e) {
-      const msg = e instanceof ConfigFileError ? e.message : errMessage(e);
+      let msg: string;
+      if (e instanceof ConfigFileError) msg = e.message;
+      else {
+        console.error("board.yaml read failed:", e); // raw errno messages carry absolute paths
+        msg = "board.yaml could not be read";
+      }
       return { columns: [], archiveColumn: "", noteColumn: "", cards: {}, fetchedAt: null, error: msg, locked: true };
     }
     const cached = await cache.read(BOARD_CACHE_ID);

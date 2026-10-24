@@ -164,6 +164,18 @@ test("view on a broken board.yaml is locked and names the file", async () => {
   assert.deepEqual(v.cards, {});
 });
 
+test("view on an unreadable board.yaml is locked with a fixed message (no paths)", async () => {
+  const { svc, dir } = setup([]);
+  fs.mkdirSync(path.join(dir, "board.yaml"));
+  const logged = test.mock.method(console, "error", () => {});
+  const v = await svc.view([], []);
+  logged.mock.restore();
+  assert.equal(v.locked, true);
+  assert.equal(v.error, "board.yaml could not be read");
+  assert.ok(!v.error!.includes("/"));
+  assert.ok(logged.mock.callCount() > 0);
+});
+
 test("refresh on a broken board.yaml leaves the cache untouched", async () => {
   const { svc, dir, searches } = setup([]);
   fs.writeFileSync(path.join(dir, "board.yaml"), "columns: [");
