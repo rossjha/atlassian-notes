@@ -5,7 +5,7 @@ import type { BoardOp, ColumnsConfig, IssueDetail, LiveEvent, Row, View } from "
 import type { ViewCache } from "./cache.ts";
 import type { Config } from "./config.ts";
 import { BoardOpError } from "./board.ts";
-import type { BoardService } from "./boardService.ts";
+import { BOARD_CACHE_ID, type BoardService } from "./boardService.ts";
 import { ConfigFileError, loadColumns, loadViews, saveViews, validateViews } from "./configFiles.ts";
 import { bothMarkdown, groomPrompt, ticketMarkdown } from "./copyText.ts";
 import { InvalidKeyError, isValidKey } from "./frontMatter.ts";
@@ -125,7 +125,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
   async function jiraIdFor(key: string): Promise<string | undefined> {
     try {
       const { views } = await currentViews();
-      return (await cache.allTickets(views.map((v) => v.id))).get(key)?.id;
+      return (await cache.allTickets([BOARD_CACHE_ID, ...views.map((v) => v.id)])).get(key)?.id;
     } catch {
       return undefined;
     }

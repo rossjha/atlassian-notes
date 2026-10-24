@@ -458,3 +458,12 @@ test("corrupted board.yaml: GET is locked, ops are 409, file untouched", async (
     fs.writeFileSync(boardFile(), good);
   }
 });
+
+test("note save takes jira_id from the board cache for a ticket in no view", async () => {
+  const cache = new ViewCache(dir);
+  await cache.write("_board", { fetchedAt: new Date().toISOString(), tickets: [ticket("777", "PAY-77")], error: null });
+  const res = await put("/api/notes/PAY-77", { body: "board-only", baseMtimeMs: null });
+  assert.equal(res.status, 200);
+  const text = fs.readFileSync(path.join(dir, "jira", "notes", "PAY-77.md"), "utf8");
+  assert.match(text, /jira_id: ['"]?777/);
+});
