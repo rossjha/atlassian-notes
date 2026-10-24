@@ -245,8 +245,10 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
         }
         throw err;
       }
-      const note = await notes.readNote(b);
-      const groom = await notes.readGroom(b);
+      // A moved ticket fetched by its old key: notes live under the canonical key.
+      const key = isValidKey(detail.ticket.key) ? detail.ticket.key : b;
+      const note = await notes.readNote(key);
+      const groom = await notes.readGroom(key);
       return send(res, 200, {
         detail,
         html: {
@@ -258,7 +260,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
         noteHtml: note ? renderMarkdownSafe(note.body) : "",
         groom,
         groomHtml: groom ? renderMarkdownSafe(groom.body) : "",
-        groomPath: notes.groomPath(b),
+        groomPath: notes.groomPath(key),
       });
     }
     if (a === "tickets" && b && c === "copy" && d && segs.length === 4 && method === "GET") {

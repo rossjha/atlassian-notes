@@ -128,6 +128,8 @@ async function load(): Promise<void> {
     if (seq !== fetchSeq || key !== openKey) return;
     payload = res;
     fetchError = null;
+    // A moved ticket opened by its old key: notes and star must target the canonical key.
+    if (res.detail.ticket.key !== key) openKey = res.detail.ticket.key;
   } catch (e) {
     if (seq !== fetchSeq || key !== openKey) return;
     fetchError = (e as Error).message;

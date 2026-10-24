@@ -467,3 +467,14 @@ test("note save takes jira_id from the board cache for a ticket in no view", asy
   const text = fs.readFileSync(path.join(dir, "jira", "notes", "PAY-77.md"), "utf8");
   assert.match(text, /jira_id: ['"]?777/);
 });
+
+test("ticket detail for a moved key reads note and groom under the canonical key", async () => {
+  const orig = jira.getIssueDetail;
+  jira.getIssueDetail = async () => detail("NEW-5");
+  assert.equal((await put("/api/notes/NEW-5", { body: "canonical note", baseMtimeMs: null })).status, 200);
+  const body = await (await fetch(base() + "/api/tickets/OLD-5")).json();
+  jira.getIssueDetail = orig;
+  assert.equal(body.detail.ticket.key, "NEW-5");
+  assert.equal(body.note.body.trim(), "canonical note");
+  assert.match(body.groomPath, /NEW-5/);
+});
