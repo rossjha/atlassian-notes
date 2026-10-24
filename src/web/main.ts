@@ -1,10 +1,12 @@
-import type { ColumnsConfig, LiveEvent, Row, View } from "../shared/types.ts";
+import type { ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api } from "./api.ts";
 import { h, relativeTime } from "./dom.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
+import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
+import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 
 const TAB_KEY = "atlassian-notes.activeTab";
 
@@ -23,8 +25,9 @@ const root = document.body;
 const tabsEl = h("nav", { class: "tabs" });
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
+const filterEl = h("div", { class: "filter-bar" });
 const tableEl = h("div", { class: "table-wrap" });
-root.append(h("main", { class: "app" }, tabsEl, headerEl, errorEl, tableEl));
+root.append(h("main", { class: "app" }, tabsEl, headerEl, errorEl, filterEl, tableEl));
 
 const handlers: TableHandlers = {
   onOpen(key) {
@@ -80,6 +83,60 @@ function activeView(): View | null {
   return views.find((v) => v.id === activeId) ?? null;
 }
 
+function onFiltersChanged(filters: Filters): void {
+  const view = activeView();
+  if (!view) return;
+  const previous = views;
+  const next = views.map((v) => (v.id === view.id ? { ...v, filters } : v));
+  views = next; // optimistic: the chips and counts update at once
+  rowsError = null;
+  renderChrome();
+  renderBody();
+  api.saveViews(next).catch((e: Error) => {
+    if (views === next) views = previous;
+    rowsError = e.message;
+    renderChrome();
+    renderBody();
+  });
+}
+
+async function saveEditedView(edited: View, isNew: boolean): Promise<void> {
+  const id = isNew ? uniqueViewId(edited.name, views.map((v) => v.id)) : edited.id;
+  const saved = { ...edited, id };
+  const old = views.find((v) => v.id === id);
+  const next = isNew ? [...views, saved] : views.map((v) => (v.id === id ? saved : v));
+  await api.saveViews(next);
+  views = next;
+  const needsRefresh = isNew || old?.jql !== saved.jql || old?.limit !== saved.limit;
+  if (isNew) selectTab(id);
+  else {
+    renderChrome();
+    renderBody();
+  }
+  if (needsRefresh) void doRefresh();
+}
+
+async function deleteView(id: string): Promise<void> {
+  const next = views.filter((v) => v.id !== id);
+  await api.saveViews(next);
+  views = next;
+  if (activeId === id && next[0]) selectTab(next[0].id);
+  else {
+    renderChrome();
+    renderBody();
+  }
+}
+
+function editView(view: View | null): void {
+  if (!columns) return;
+  openViewEditor(
+    view,
+    columns,
+    (v) => saveEditedView(v, view === null),
+    view && views.length > 1 ? () => deleteView(view.id) : undefined,
+  );
+}
+
 function selectTab(id: string): void {
   activeId = id;
   remember(id);
@@ -95,8 +152,12 @@ function selectTab(id: string): void {
 function renderChrome(): void {
   tabsEl.replaceChildren(
     ...views.map((v) =>
-      h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
+      h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
+        h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
+        h("button", { type: "button", class: "tab-edit", title: "Edit view", "aria-label": `Edit view ${v.name}`, onclick: () => editView(v) }, "✎"),
+      ),
     ),
+    h("button", { type: "button", class: "tab tab-add", onclick: () => editView(null) }, "+ view"),
   );
   const view = activeView();
   headerEl.replaceChildren();
@@ -129,10 +190,12 @@ function renderBody(): void {
   renderDeferred = false;
   const view = activeView();
   if (!view || !columns) {
+    filterEl.replaceChildren();
     tableEl.replaceChildren(h("p", { class: "empty-state" }, configError ? "" : "No views configured."));
     return;
   }
   let shown = applyFilters(rows, view.filters);
+  renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length }, onFiltersChanged);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
   renderTable(tableEl, view, shown, columns, handlers, sort);
 }

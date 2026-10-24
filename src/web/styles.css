@@ -75,4 +75,45 @@ body {
   .editor-msg { color: #fecaca; background: #7f1d1d; border: 1px solid #b91c1c; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 12px; white-space: pre-wrap; }
   .editor-msg[hidden], .editor-actions[hidden] { display: none; }
   .editor-actions { display: flex; gap: 0.4rem; }
+
+  .tab-wrap { display: inline-flex; align-items: center; border-bottom: 2px solid transparent; }
+  .tab-wrap.active { border-bottom-color: var(--accent); }
+  .tab-wrap .tab, .tab-wrap .tab.active { border-bottom: 0; padding-right: 0.3rem; }
+  .tab-edit { color: var(--muted); background: none; cursor: pointer; padding: 0 0.4rem 0 0; font-size: 12px; }
+  .tab-edit:hover { color: var(--accent); }
+  .tab-add { color: var(--accent); }
+
+  .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; }
+  .fb-wrap { position: relative; display: inline-block; }
+  .fb-chip { display: inline-flex; align-items: center; border: 1px solid var(--accent); border-radius: 999px; background: rgba(96, 165, 250, 0.12); }
+  .fb-chip-label { padding: 0.05rem 0.2rem 0.05rem 0.6rem; background: none; color: var(--text); cursor: pointer; font-size: 12px; }
+  .fb-chip-x { padding: 0 0.5rem 0 0.2rem; background: none; color: var(--muted); cursor: pointer; }
+  .fb-chip-x:hover { color: var(--text); }
+  .fb-pop { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: 0.25rem; min-width: 12rem; max-height: 20rem; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0.35rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+  .fb-pop[hidden] { display: none; }
+  .fb-menu-item { display: block; width: 100%; text-align: left; padding: 0.25rem 0.5rem; background: none; color: var(--text); cursor: pointer; border-radius: 3px; }
+  .fb-menu-item:hover { background: rgba(148, 163, 184, 0.12); }
+  .fb-opt { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.3rem; cursor: pointer; white-space: nowrap; }
+  .fb-sep { border: 0; border-top: 1px solid var(--line); margin: 0.3rem 0; }
+  .fb-text { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 0.2rem 0.4rem; font: inherit; }
+  .fb-count { margin-left: auto; }
+
+  .ve-dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 0; width: min(38rem, 94vw); max-height: 90vh; }
+  .ve-dialog::backdrop { background: rgba(2, 6, 23, 0.7); }
+  .ve-form { display: flex; flex-direction: column; gap: 0.35rem; padding: 1rem; }
+  .ve-title { font-size: 15px; font-weight: 600; margin-bottom: 0.25rem; }
+  .ve-field { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 0.4rem; }
+  .ve-input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 0.25rem 0.5rem; font: inherit; }
+  .ve-input:focus { border-color: var(--accent); outline: none; }
+  .ve-limit { width: 7rem; }
+  .ve-cols { list-style: none; margin: 0; padding: 0; max-height: 18rem; overflow-y: auto; border: 1px solid var(--line); border-radius: 4px; }
+  .ve-col { display: flex; align-items: center; gap: 0.4rem; padding: 0.15rem 0.5rem; border-bottom: 1px solid var(--line); }
+  .ve-col:last-child { border-bottom: 0; }
+  .ve-col-label { flex: 1; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+  .ve-display { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+  .ve-move { padding: 0 0.45rem; }
+  .ve-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
+  .ve-spacer { flex: 1; }
+  .ve-primary { border-color: var(--accent); }
+  .ve-danger { background: #7f1d1d; border-color: #b91c1c; color: #fecaca; }
 }
