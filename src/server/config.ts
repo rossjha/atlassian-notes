@@ -37,6 +37,10 @@ const KEYS = [
 ];
 const REQUIRED = ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN", "JIRA_PROJECT"];
 
+export function apiBaseFor(siteUrl: string, cloudId?: string): string {
+  return cloudId ? `https://api.atlassian.com/ex/jira/${cloudId}` : siteUrl;
+}
+
 export function envFilePath(env: Env, home: string): string {
   return env.ATLASSIAN_NOTES_ENV || join(home, ".config", "atlassian-notes", ".env");
 }
@@ -100,9 +104,7 @@ export function loadConfig(
   const jiraBaseUrl = v.JIRA_BASE_URL!.replace(/\/+$/, "");
   return {
     jiraBaseUrl,
-    jiraApiBase: v.JIRA_CLOUD_ID
-      ? `https://api.atlassian.com/ex/jira/${v.JIRA_CLOUD_ID}`
-      : jiraBaseUrl,
+    jiraApiBase: apiBaseFor(jiraBaseUrl, v.JIRA_CLOUD_ID),
     jiraEmail: v.JIRA_EMAIL!,
     jiraApiToken: v.JIRA_API_TOKEN!,
     defaultProject: v.JIRA_PROJECT!,

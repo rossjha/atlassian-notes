@@ -1,0 +1,87 @@
+# atlassian-notes
+
+A small local web app for refining Jira tickets privately. It pulls tickets from Jira (read-only) into tabbed table views and lets you keep your own markdown notes beside each one, plus notes written by a Claude Code grooming skill. Notes are plain files on your disk. Nobody else sees them.
+
+## Install
+
+Requires Node 22.18 or newer.
+
+```sh
+npm install
+npm run setup   # asks for site, email, token, default project; checks the connection
+npm start       # builds the CSS/JS, starts on http://127.0.0.1:4317 and opens your browser
+```
+
+Your Jira settings are saved to `~/.config/atlassian-notes/.env` (mode 600), outside this folder. Set `ATLASSIAN_NOTES_ENV` to use a different file. The app never reads a `.env` in the app folder. `.env.example` lists every key (`NOTES_DIR`, `REFRESH_MINUTES`, `PORT`, `OPEN_BROWSER` are optional).
+
+## The API token
+
+Create one at <https://id.atlassian.com/manage-profile/security/api-tokens>.
+
+- Recommended: a scoped token ("Create API token with scopes") with only `read:jira-work` and `read:jira-user`. Scoped tokens can't go through your `*.atlassian.net` address, so requests go via `api.atlassian.com`. `npm run setup` handles this: answer "y" to "scoped token" and it looks up your site's cloud id and stores it as `JIRA_CLOUD_ID`. Scoped tokens expire (at most one year), so re-run `npm run setup` when it stops working.
+- A classic token also works. The app only ever makes GET requests either way.
+
+## Where your data lives
+
+Everything personal lives in `NOTES_DIR` (default `~/atlassian-notes-data`), never in the app folder:
+
+```
+views.yaml            tabs: name, JQL, columns, filters
+columns.yaml          custom columns + Jira field mapping
+jira/notes/KEY.md     your notes
+jira/groom/KEY.md     groom output written by Claude (the app only reads it)
+.cache/               last Jira results, so the app opens instantly
+```
+
+On first run, `views.yaml` and `columns.yaml` are created from `examples/` with your default project key filled in. Hand edits are picked up live. Note: the app rewrites `views.yaml` when you change a view in the UI, so comments you added to it are lost.
+
+## views.yaml and columns.yaml
+
+`views.yaml`: each view has an `id`, `name`, `jql`, ordered `columns` (each `id`, optionally `display: truncate`) and optionally `limit` (default 500). See `examples/views.example.yaml`. Built-in column ids: `key`, `summary`, `status`, `type`, `priority`, `assignee`, `reporter`, `storyPoints`, `parent`, `labels`, `sprint`, `updated`, plus `note` and `groom`.
+
+`columns.yaml`: see `examples/columns.example.yaml`.
+
+```yaml
+jiraFields:
+  storyPoints: customfield_10016   # differs per Jira site
+  sprint: customfield_10020
+custom:
+  category:
+    label: Category
+    type: select                   # or: text
+    options:
+      Tech debt: "#e5b45b"
+```
+
+Finding your field ids: open `https://<your-site>/rest/api/3/field` in a browser while logged in to Jira and search for "Story point estimate" and "Sprint". The `id` is the `customfield_NNNNN` value. Custom column values are stored in each note's front matter. Option lists are only edited in this file, but you filter on them from the UI.
+
+## Groom file contract
+
+Claude (or any tool) writes `$NOTES_DIR/jira/groom/<KEY>.md`:
+
+```markdown
+---
+key: PAY-412                 # optional; the app fills it in
+jira_id: "10234"             # optional; the app fills it in
+readiness: Needs work        # short free text
+summary: 3 gaps in AC; suggest split into retry + alerting
+groomed_at: 2026-10-22T14:03:00Z
+---
+(full groom output, any markdown)
+```
+
+The table shows `readiness`, `summary` and age. Without front matter, the first non-empty line is shown. The app never changes the body of a groom file.
+
+To wire up your own Claude skill (for example `groom-work-item`), add this line to it:
+
+> Save your output to `$NOTES_DIR/jira/groom/<KEY>.md` (default `~/atlassian-notes-data`) with front matter `readiness`, `summary` and `groomed_at` (ISO timestamp), followed by the full write-up.
+
+## Sharing
+
+`npm run pack` writes `atlassian-notes.zip` next to the app folder, containing only code, examples and this README. No token, notes, cache or `node_modules`. Send that. Recipients unzip, then follow Install above.
+
+## Privacy
+
+- Only HTTP GET requests, only to your Jira site (or `api.atlassian.com` for scoped tokens). The app cannot change anything in Jira.
+- The server listens on 127.0.0.1 only. The page loads nothing from outside (CSP `default-src 'self'`): no CDNs, fonts, analytics or telemetry.
+- The token lives only in `~/.config/atlassian-notes/.env`; `setup` never prints it.
