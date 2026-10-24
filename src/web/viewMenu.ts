@@ -32,6 +32,31 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("resize", () => closeMenu());
 
 /** Opens `el` as the menu for `anchor`, right-aligned under it (both anchors sit at the far right of their bar). */
+/** True while one of these menus is open (the drawer's Esc handler leaves Esc to the menu). */
+export function isMenuOpen(): boolean {
+  return openMenu !== null;
+}
+
+/** A text button that opens a simple menu of actions. */
+export function menuButton(opts: { label: string; title: string; leadingIcon?: SVGSVGElement; items: { label: string; title?: string; onSelect: () => void }[] }): HTMLElement {
+  const btn = h("button", {
+    type: "button",
+    class: "btn btn-icon",
+    title: opts.title,
+    "aria-haspopup": "menu",
+    "aria-expanded": "false",
+  }, opts.leadingIcon ?? null, opts.label, icon("chevronDown", "btn-svg btn-chevron"));
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (openMenu?.anchor === btn) return closeMenu();
+    closeMenu();
+    const items = opts.items.map((it) =>
+      h("button", { type: "button", role: "menuitem", class: "menu-item", title: it.title ?? it.label, onclick: () => { closeMenu(true); it.onSelect(); } }, it.label));
+    showMenu(btn, h("div", { class: "menu", role: "menu", "aria-label": opts.title }, ...items));
+  });
+  return btn;
+}
+
 function showMenu(anchor: HTMLElement, el: HTMLElement, focus = ".menu-item:not([disabled])"): void {
   document.body.append(el);
   const r = anchor.getBoundingClientRect();

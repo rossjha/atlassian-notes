@@ -357,7 +357,7 @@ function renderChrome(): void {
         ? h("code", { class: "jql" }, view.jql)
         : h("button", { type: "button", class: "jql jql-btn", title: "Click to edit JQL (Enter saves, Esc cancels)", onclick: () => startJqlEdit(view) }, view.jql);
     headerEl.append(
-      jql,
+      h("div", { class: "jql-field" }, icon("jira", "jql-icon brand-jira"), jql),
       h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(fetchedAt)}`),
       refresh,
     );

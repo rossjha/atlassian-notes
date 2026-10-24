@@ -65,6 +65,7 @@ body {
   @media (prefers-reduced-motion: reduce) { .icon-spin { animation: none; } }
   .btn-icon { display: inline-flex; align-items: center; gap: 0.35rem; }
   .btn-svg { width: 14px; height: 14px; flex: none; }
+  .btn-chevron { width: 12px; height: 12px; margin-left: -0.1rem; color: var(--muted); }
   .link-icon { display: inline-flex; align-items: center; gap: 0.3rem; }
   .link-svg { width: 12px; height: 12px; flex: none; }
   /* Brand marks keep their own colours in every theme. */
@@ -77,6 +78,10 @@ body {
   .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
   .view-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; }
   .jql { font-family: var(--font); font-size: 12px; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.15rem 0.5rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The JQL bar carries the Jira mark inside it, like the search box's magnifying glass. */
+  .jql-field { position: relative; display: flex; flex: 1; min-width: 0; }
+  .jql-icon { position: absolute; left: 0.5rem; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; pointer-events: none; z-index: 1; }
+  .jql-field > .jql { flex: 1; padding-left: 1.75rem; }
   .btn { padding: 0.2rem 0.7rem; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--fg); cursor: pointer; }
   .btn:hover:not(:disabled) { border-color: var(--accent); }
   .btn:disabled { opacity: 0.6; cursor: default; }
