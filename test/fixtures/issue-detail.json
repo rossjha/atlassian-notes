@@ -1,0 +1,40 @@
+{
+  "id": "10001",
+  "key": "PAY-1",
+  "fields": {
+    "summary": "Add retry to checkout",
+    "status": { "name": "In Progress", "statusCategory": { "name": "In Progress" } },
+    "issuetype": { "name": "Story" },
+    "priority": { "name": "High" },
+    "assignee": { "displayName": "Alex Example" },
+    "reporter": { "displayName": "Sam Sample" },
+    "parent": { "key": "PAY-100", "fields": { "summary": "Checkout epic" } },
+    "labels": ["backend"],
+    "updated": "2026-10-20T09:30:00.000+0000",
+    "customfield_10016": 5,
+    "customfield_10020": [{ "id": 2, "name": "Sprint 2", "state": "active" }],
+    "customfield_10030": {
+      "type": "doc", "version": 1,
+      "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Retries happen three times" }] }]
+    },
+    "description": {
+      "type": "doc", "version": 1,
+      "content": [
+        { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Background" }] },
+        { "type": "paragraph", "content": [{ "type": "text", "text": "Checkout fails on timeouts." }] }
+      ]
+    },
+    "comment": {
+      "comments": [
+        {
+          "author": { "displayName": "Sam Sample" },
+          "created": "2026-10-19T10:00:00.000+0000",
+          "body": {
+            "type": "doc", "version": 1,
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Looks good" }] }]
+          }
+        }
+      ]
+    }
+  }
+}

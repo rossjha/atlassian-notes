@@ -1,0 +1,58 @@
+{
+  "nextPageToken": "t2",
+  "issues": [
+    {
+      "id": "10001",
+      "key": "PAY-1",
+      "fields": {
+        "summary": "Add retry to checkout",
+        "status": { "name": "In Progress", "statusCategory": { "name": "In Progress" } },
+        "issuetype": { "name": "Story" },
+        "priority": { "name": "High" },
+        "assignee": { "displayName": "Alex Example" },
+        "reporter": { "displayName": "Sam Sample" },
+        "parent": { "key": "PAY-100", "fields": { "summary": "Checkout epic" } },
+        "labels": ["backend", "payments"],
+        "updated": "2026-10-20T09:30:00.000+0000",
+        "customfield_10016": 5,
+        "customfield_10020": [
+          { "id": 1, "name": "Sprint 1", "state": "closed" },
+          { "id": 2, "name": "Sprint 2", "state": "active" },
+          { "id": 3, "name": "Sprint 3", "state": "future" }
+        ]
+      }
+    },
+    {
+      "id": "10002",
+      "key": "PAY-2",
+      "fields": {
+        "summary": "Fix rounding",
+        "status": { "name": "To Do", "statusCategory": { "name": "To Do" } },
+        "issuetype": { "name": "Bug" },
+        "priority": null,
+        "assignee": null,
+        "reporter": null,
+        "parent": null,
+        "labels": [],
+        "updated": "2026-10-19T09:30:00.000+0000",
+        "customfield_10016": null,
+        "customfield_10020": [
+          { "id": 1, "name": "Sprint 1", "state": "closed" },
+          { "id": 3, "name": "Sprint 3", "state": "future" }
+        ]
+      }
+    },
+    {
+      "id": "10003",
+      "key": "PAY-3",
+      "fields": {
+        "summary": "No sprint",
+        "status": { "name": "Done", "statusCategory": { "name": "Done" } },
+        "issuetype": { "name": "Task" },
+        "labels": [],
+        "updated": "2026-10-18T09:30:00.000+0000",
+        "customfield_10020": null
+      }
+    }
+  ]
+}

@@ -69,3 +69,28 @@ export interface ColumnsConfig {
   custom: Record<string, CustomColumnDef>;
   groomPrompt: string;
 }
+
+export interface Ticket {
+  id: string;
+  key: string;
+  url: string;
+  summary: string;
+  status: string;
+  statusCategory: string;
+  type: string;
+  priority: string | null;
+  assignee: string | null;
+  reporter: string | null;
+  storyPoints: number | null;
+  parent: { key: string; summary: string } | null;
+  labels: string[];
+  sprint: string | null;
+  updated: string;
+}
+
+export interface IssueDetail {
+  ticket: Ticket;
+  descriptionMd: string;
+  acceptanceCriteriaMd: string | null;
+  comments: { author: string; created: string; bodyMd: string }[];
+}
