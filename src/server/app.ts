@@ -227,6 +227,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     if (a === "views" && b && c === "refresh" && segs.length === 3 && method === "POST") {
       const view = await findView(b);
       await refresher.refreshView(view);
+      refresher.scheduleTicketFiles();
       return send(res, 200, await rowsFor(view, await loadColumns(config.notesDir)));
     }
     if (a === "orphans" && segs.length === 1 && method === "GET") {
@@ -328,6 +329,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     }
     if (a === "board" && b === "refresh" && segs.length === 2 && method === "POST") {
       await board.refresh();
+      refresher.scheduleTicketFiles();
       return send(res, 200, await boardView());
     }
     if (a === "events" && segs.length === 1 && method === "GET") {

@@ -130,3 +130,51 @@ export async function syncTicketFiles(deps: {
   }
   return { written, deleted };
 }
+
+export interface TicketFileSyncer {
+  sync(): Promise<void>;
+  schedule(): void;
+}
+
+// Runs never overlap. Calls made while a run is in flight share one follow-up run.
+export function createTicketFileSyncer(run: () => Promise<unknown>, debounceMs = 500): TicketFileSyncer {
+  let current: Promise<void> | null = null;
+  let next: Promise<void> | null = null;
+  let timer: NodeJS.Timeout | null = null;
+
+  const exec = (): Promise<void> => {
+    const p = (async () => {
+      try {
+        await run();
+      } catch (e) {
+        console.error("ticket file sync failed:", e instanceof Error ? e.message : e);
+      }
+    })().finally(() => {
+      if (current === p) current = null;
+    });
+    current = p;
+    return p;
+  };
+
+  const sync = (): Promise<void> => {
+    if (!current) return exec();
+    if (!next) {
+      next = current.then(() => {
+        next = null;
+        return exec();
+      });
+    }
+    return next;
+  };
+
+  const schedule = (): void => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      void sync();
+    }, debounceMs);
+    timer.unref();
+  };
+
+  return { sync, schedule };
+}

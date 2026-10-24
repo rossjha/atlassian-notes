@@ -3,6 +3,7 @@ import type { CachedView, ViewCache } from "./cache.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
 import type { NotesStore } from "./notesStore.ts";
 import { reconcile } from "./reconcile.ts";
+import type { TicketFileSyncer } from "./ticketFiles.ts";
 
 export interface RefresherDeps {
   jira: JiraClient;
@@ -12,6 +13,7 @@ export interface RefresherDeps {
   onChange: (e: LiveEvent) => void;
   statePath: string;
   now?: () => Date;
+  ticketFiles?: TicketFileSyncer;
   board?: {
     refresh(): Promise<void>;
     tickets(): Promise<Map<string, Ticket>>;
@@ -105,6 +107,11 @@ export class Refresher {
       this.orphanKeys = orphans;
       onChange({ type: "orphans" });
     }
+    await this.deps.ticketFiles?.sync();
+  }
+
+  scheduleTicketFiles(): void {
+    this.deps.ticketFiles?.schedule();
   }
 
   start(minutes: number): void {

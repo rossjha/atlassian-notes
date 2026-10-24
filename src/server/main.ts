@@ -12,6 +12,7 @@ import { ensureDataDir, loadColumns, loadViews } from "./configFiles.ts";
 import { createJiraClient, type JiraClient } from "./jira.ts";
 import { NotesStore } from "./notesStore.ts";
 import { Refresher } from "./refresher.ts";
+import { createTicketFileSyncer, syncTicketFiles } from "./ticketFiles.ts";
 import { watchNotesDir } from "./watcher.ts";
 
 assertNodeVersion(); // first statement: a clear message instead of an obscure failure on old Node
@@ -81,8 +82,17 @@ async function main(): Promise<void> {
     statePath: path.join(config.notesDir, ".cache", "board-state.json"),
     onChange: (e) => broadcast(e),
   });
+  const ticketFiles = createTicketFileSyncer(() =>
+    syncTicketFiles({
+      notesDir: config.notesDir,
+      cache,
+      notes,
+      getCustom: async () => (await loadColumns(config.notesDir)).custom,
+    }),
+  );
   const refresher = new Refresher({
     board,
+    ticketFiles,
     jira,
     cache,
     notes,
@@ -107,6 +117,7 @@ async function main(): Promise<void> {
     if (e.type === "columns") {
       makeClient().then((c) => { inner = c; }, () => {});
     }
+    if (e.type === "note" || e.type === "groom" || e.type === "columns") ticketFiles.schedule();
     app.broadcast(e);
   });
 

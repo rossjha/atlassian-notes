@@ -153,3 +153,21 @@ test("a throwing board refresh is logged and does not abort the cycle", async ()
   try { await r.refreshAll(); } finally { console.error = orig; }
   assert.equal(logged.length, 1);
 });
+
+test("runAll syncs ticket files once at the end", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-"));
+  const calls: string[] = [];
+  const jira = { search: async () => [t("100", "PAY-1")], getIssueBrief: async () => null, getIssueDetail: async () => { throw new Error("unused"); } } as JiraClient;
+  const r = new Refresher({
+    jira, cache: new ViewCache(dir), notes: new NotesStore(dir), getViews: async () => [view], onChange: () => {},
+    statePath: path.join(dir, ".cache", "reconcile.json"), now: () => new Date("2026-10-24T10:00:00Z"),
+    ticketFiles: {
+      sync: async () => { calls.push(`sync after ${fs.existsSync(path.join(dir, ".cache", "reconcile.json")) ? "reconcile" : "nothing"}`); },
+      schedule: () => calls.push("schedule"),
+    },
+  });
+  await r.refreshAll();
+  assert.deepEqual(calls, ["sync after reconcile"]);
+  r.scheduleTicketFiles();
+  assert.deepEqual(calls, ["sync after reconcile", "schedule"]);
+});

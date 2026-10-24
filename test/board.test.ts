@@ -171,3 +171,7 @@ test("parseBoard upper-cases and trims hand-typed keys (deduping after normalisi
   const b = parseBoard("columns: [A, B]\ncards:\n  A: [pay-1, ' Pay-2 ']\n  B: [PAY-1]\n", "board.yaml");
   assert.deepEqual(b.cards, { A: ["PAY-1", "PAY-2"], B: [] });
 });
+
+test("ticket files are ignored by the watcher", () => {
+  assert.equal(eventForPath("jira/tickets/AAA-1.md"), null);
+});

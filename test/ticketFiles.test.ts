@@ -7,7 +7,7 @@ import type { CustomColumnDef, Ticket } from "../src/shared/types.ts";
 import { NotesStore } from "../src/server/notesStore.ts";
 import { ViewCache } from "../src/server/cache.ts";
 import { parseFrontMatter } from "../src/server/frontMatter.ts";
-import { renderTicketFile, syncTicketFiles, tagSlug } from "../src/server/ticketFiles.ts";
+import { createTicketFileSyncer, renderTicketFile, syncTicketFiles, tagSlug } from "../src/server/ticketFiles.ts";
 
 let dir: string;
 let cache: ViewCache;
@@ -198,4 +198,54 @@ test("union spans view and board caches", async () => {
   await cache.write("_board", { fetchedAt: null, tickets: [ticket("BBB-2")], error: null });
   await syncTicketFiles(deps());
   await fs.stat(tpath("BBB-2"));
+});
+
+test("sync calls are serialised and coalesced", async () => {
+  let active = 0;
+  let maxActive = 0;
+  let runs = 0;
+  const gates: Array<() => void> = [];
+  const syncer = createTicketFileSyncer(async () => {
+    runs++;
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise<void>((resolve) => gates.push(resolve));
+    active--;
+  });
+  const all = Promise.all([syncer.sync(), syncer.sync(), syncer.sync()]);
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(runs, 1);
+  gates[0]();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(runs, 2);
+  gates[1]();
+  await all;
+  assert.equal(runs, 2);
+  assert.equal(maxActive, 1);
+});
+
+test("sync swallows errors", async () => {
+  let runs = 0;
+  const syncer = createTicketFileSyncer(async () => {
+    runs++;
+    if (runs === 1) throw new Error("boom");
+  });
+  const orig = console.error;
+  console.error = () => {};
+  try {
+    await syncer.sync();
+    await syncer.sync();
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(runs, 2);
+});
+
+test("schedule debounces", async () => {
+  let runs = 0;
+  const syncer = createTicketFileSyncer(async () => { runs++; }, 20);
+  for (let i = 0; i < 5; i++) syncer.schedule();
+  assert.equal(runs, 0);
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(runs, 1);
 });
