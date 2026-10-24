@@ -1,0 +1,88 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { ViewCache } from "../src/server/cache.ts";
+import { Refresher } from "../src/server/refresher.ts";
+import { NotesStore } from "../src/server/notesStore.ts";
+import { JiraError, type JiraClient } from "../src/server/jira.ts";
+import type { LiveEvent, Ticket, View } from "../src/shared/types.ts";
+
+const view: View = { id: "current", name: "Current", jql: "project = PAY", limit: 50, columns: [], filters: {} };
+const t = (id: string, key: string) => ({ id, key, summary: "s" }) as Ticket;
+
+function setup(search: JiraClient["search"], brief: JiraClient["getIssueBrief"] = async () => null) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-"));
+  const notes = new NotesStore(dir);
+  const cache = new ViewCache(dir);
+  const events: LiveEvent[] = [];
+  const jira = { search, getIssueBrief: brief, getIssueDetail: async () => { throw new Error("unused"); } } as JiraClient;
+  const r = new Refresher({
+    jira, cache, notes, getViews: async () => [view], onChange: (e) => events.push(e),
+    statePath: path.join(dir, ".cache", "reconcile.json"), now: () => new Date("2026-10-24T10:00:00Z"),
+  });
+  return { dir, notes, cache, events, r };
+}
+
+test("cache read returns empty when missing or corrupt", async () => {
+  const { dir, cache } = setup(async () => []);
+  assert.deepEqual(await cache.read("nope"), { fetchedAt: null, tickets: [], error: null });
+  fs.mkdirSync(path.join(dir, ".cache", "views"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".cache", "views", "bad.json"), "{nope");
+  assert.deepEqual(await cache.read("bad"), { fetchedAt: null, tickets: [], error: null });
+});
+
+test("successful refresh writes cache, adds identity to existing note, emits rows", async () => {
+  const { notes, cache, events, r } = setup(async () => [t("100", "PAY-1")]);
+  await notes.writeNoteBody("PAY-1", "hi", { baseMtimeMs: null });
+  const v = await r.refreshView(view);
+  assert.equal(v.error, null);
+  assert.equal(v.fetchedAt, "2026-10-24T10:00:00.000Z");
+  assert.equal((await cache.read("current")).tickets[0].key, "PAY-1");
+  assert.equal((await notes.readNote("PAY-1"))!.data.jira_id, "100");
+  assert.deepEqual(events, [{ type: "rows", viewId: "current" }]);
+  assert.equal((await cache.allTickets(["current"])).get("PAY-1")!.id, "100");
+});
+
+test("failed refresh keeps tickets and fetchedAt, sets error, emits rows", async () => {
+  let fail = false;
+  const { cache, events, r } = setup(async () => {
+    if (fail) throw new JiraError(400, ["bad jql"]);
+    return [t("100", "PAY-1")];
+  });
+  const first = await r.refreshView(view);
+  fail = true;
+  events.length = 0;
+  const second = await r.refreshView(view);
+  assert.equal(second.error, "bad jql");
+  assert.equal(second.fetchedAt, first.fetchedAt);
+  assert.equal(second.tickets.length, 1);
+  assert.equal((await cache.read("current")).error, "bad jql");
+  assert.deepEqual(events, [{ type: "rows", viewId: "current" }]);
+});
+
+test("non-JiraError exceptions are treated as failures", async () => {
+  const { r } = setup(async () => { throw new Error("kaboom"); });
+  assert.equal((await r.refreshView(view)).error, "kaboom");
+});
+
+test("refreshAll reconciles, emits orphans on change, and overlapping calls share a promise", async () => {
+  const { notes, events, r } = setup(async () => [t("100", "PAY-1")]);
+  await notes.writeNoteBody("GONE-1", "x", { baseMtimeMs: null, jiraId: "999" });
+  const p1 = r.refreshAll();
+  const p2 = r.refreshAll();
+  assert.equal(p1, p2);
+  await p1;
+  assert.deepEqual(r.orphans(), ["GONE-1"]);
+  assert.equal(events.filter((e) => e.type === "orphans").length, 1);
+  await r.refreshAll();
+  assert.equal(events.filter((e) => e.type === "orphans").length, 1);
+});
+
+test("start/stop schedules and clears without crashing on failure", async () => {
+  const { r } = setup(async () => { throw new Error("x"); });
+  r.start(0.0005);
+  await new Promise((res) => setTimeout(res, 100));
+  r.stop();
+});

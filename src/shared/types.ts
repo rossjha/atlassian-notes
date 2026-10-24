@@ -102,3 +102,9 @@ export interface Row {
   custom: Record<string, string>;
   flags: { jiraNewerThanNote: boolean; jiraNewerThanGroom: boolean };
 }
+
+export type LiveEvent =
+  | { type: "rows"; viewId: string }
+  | { type: "note" | "groom"; key: string }
+  | { type: "views" | "columns" }
+  | { type: "orphans" };
