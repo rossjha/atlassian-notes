@@ -26,3 +26,9 @@ From per-task reviews; the final whole-branch review triaged these as fine to de
 
 ## Open UI nits (deferred to phase 3 styling)
 - JQL bar: text still shifts very slightly when clicking into the inline editor (button → textarea), even after aligning line-height and border-box height (commit d1fa080). Revisit with the Carbon restyle.
+
+## Column resize/reorder (deferred)
+- While a views save is pending, loadConfig keeps local views, so an external views.yaml edit landing in that window waits for the next live event.
+- A loadConfig fetched before a save began but resolving after it can briefly show an older server snapshot.
+- If a save fails because the server is down, the follow-up reload also fails; optimistic views stay on screen with the error shown.
+- A resize committed while views.yaml is locked stays visually applied until the next render.
