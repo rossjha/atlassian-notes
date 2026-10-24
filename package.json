@@ -1,0 +1,27 @@
+{
+  "name": "atlassian-notes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.web.json && tailwindcss -i src/web/styles.css -o public/app.css --minify",
+    "start": "npm run build && node src/server/main.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json --noEmit",
+    "setup": "node scripts/setup.ts",
+    "pack": "node scripts/pack.ts"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "@types/node": "^26.6.5",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "marked": "^18.1.1",
+    "yaml": "^2.9.1"
+  }
+}

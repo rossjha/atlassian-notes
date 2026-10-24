@@ -3,3 +3,5 @@ dist/
 .env
 *.zip
 .superpowers/
+public/js/
+public/app.css
