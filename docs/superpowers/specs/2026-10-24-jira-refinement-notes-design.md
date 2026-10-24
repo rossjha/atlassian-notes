@@ -1,7 +1,7 @@
 # atlassian-notes — Jira refinement notes (design)
 
 Date: 2026-10-24
-Status: draft for approval
+Status: approved
 
 ## Intent
 
