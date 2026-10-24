@@ -131,6 +131,14 @@ export async function loadViews(notesDir: string, columns: ColumnsConfig): Promi
   const file = path.join(notesDir, "views.yaml");
   const raw = await readYaml(file);
   if (raw === null) return [];
+  return validateViews(raw, columns, file);
+}
+
+export function validateViews(
+  raw: unknown,
+  columns: ColumnsConfig,
+  file: string = "views.yaml",
+): View[] {
   if (!isObj(raw) || !Array.isArray(raw.views)) throw new ConfigFileError(file, "expected a top-level `views:` list");
   const seen = new Set<string>();
   return raw.views.map((rv, i): View => {
