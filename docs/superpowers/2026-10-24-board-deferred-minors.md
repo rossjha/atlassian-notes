@@ -23,3 +23,6 @@ From per-task reviews; the final whole-branch review triaged these as fine to de
 - Task 6: minor (deferred): refresh-on-move of unknown key untested; refires per drag for no-cache cards
 - Task 6: minor (deferred): no unit test for auto-move gating (could extract shouldAutoMove to shared)
 - Task 7: minor (deferred): unnecessary casts in rowOps tests; no sortRows test for groomed
+
+## Open UI nits (deferred to phase 3 styling)
+- JQL bar: text still shifts very slightly when clicking into the inline editor (button → textarea), even after aligning line-height and border-box height (commit d1fa080). Revisit with the Carbon restyle.
