@@ -45,7 +45,7 @@ export async function ensureDataDir(notesDir: string, projectKey: string, exampl
   for (const d of ["jira/notes", "jira/groom", ".cache/views"]) {
     await fs.mkdir(path.join(notesDir, d), { recursive: true });
   }
-  for (const name of ["views", "columns"]) {
+  for (const name of ["views", "columns", "board"]) {
     const target = path.join(notesDir, `${name}.yaml`);
     if (await exists(target)) continue;
     const template = await fs.readFile(path.join(examplesDir, `${name}.example.yaml`), "utf8");

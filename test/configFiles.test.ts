@@ -31,6 +31,15 @@ test("ensureDataDir creates dirs and substitutes the project key, never overwrit
   assert.equal(await fs.readFile(path.join(dir, "columns.yaml"), "utf8"), "custom: {}\n");
 });
 
+test("ensureDataDir creates board.yaml and keeps edits", async () => {
+  await ensureDataDir(dir, "PAY", examples);
+  const text = await fs.readFile(path.join(dir, "board.yaml"), "utf8");
+  assert.match(text, /^columns: \[Backlog, Doing, PEN, Done\]/);
+  await fs.writeFile(path.join(dir, "board.yaml"), "columns: [X]\n");
+  await ensureDataDir(dir, "PAY", examples);
+  assert.equal(await fs.readFile(path.join(dir, "board.yaml"), "utf8"), "columns: [X]\n");
+});
+
 test("loadViews on generated files returns the 3 example views with defaults", async () => {
   await ensureDataDir(dir, "PAY", examples);
   const columns = await loadColumns(dir);

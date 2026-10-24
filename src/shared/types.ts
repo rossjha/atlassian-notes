@@ -103,8 +103,21 @@ export interface Row {
   flags: { jiraNewerThanNote: boolean; jiraNewerThanGroom: boolean };
 }
 
+export interface BoardFile {
+  columns: string[];
+  archiveColumn: string;
+  cards: Record<string, string[]>;
+}
+
+export type BoardOp =
+  | { op: "add"; key: string }
+  | { op: "remove"; key: string }
+  | { op: "move"; key: string; column: string; index: number }
+  | { op: "archive" };
+
 export type LiveEvent =
   | { type: "rows"; viewId: string }
   | { type: "note" | "groom"; key: string }
   | { type: "views" | "columns" }
-  | { type: "orphans" };
+  | { type: "orphans" }
+  | { type: "board" };
