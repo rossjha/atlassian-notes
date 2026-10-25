@@ -639,3 +639,27 @@ test("SSE delivers a reading event when a reading item file is written", async (
   ac.abort();
   assert.ok(buf.includes(want), buf);
 });
+
+test("GET /api/reading/<id> returns the item with sanitised noteHtml and groomHtml", async () => {
+  const id = await addItem("https://example.com/detail-me");
+  await put(`/api/reading/${id}/note`, { body: "Hi <script>alert(1)</script> **bold**", baseMtimeMs: null, force: true });
+  fs.writeFileSync(path.join(dir, "reading", "groom", `${id}.md`), "---\nsummary: s\n---\n# Ideas\n<img src=x onerror=alert(1)>\n");
+  const res = await fetch(base() + `/api/reading/${id}`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.item.id, id);
+  assert.ok(body.noteHtml.includes("<strong>bold</strong>"), body.noteHtml);
+  assert.ok(!body.noteHtml.includes("<script"), body.noteHtml);
+  assert.ok(body.groomHtml.includes("Ideas") && !body.groomHtml.includes("<img"), body.groomHtml);
+  assert.equal(body.groomPath, path.join(dir, "reading", "groom", `${id}.md`));
+  assert.equal((await fetch(base() + "/api/reading/no-such-item")).status, 404);
+});
+
+test("DELETE /api/reading/<id> also removes its Kanban card", async () => {
+  const id = await addItem("https://example.com/starred-then-deleted");
+  resetBoard();
+  assert.equal((await postOp({ op: "add", key: `reading:${id}` })).status, 200);
+  assert.ok(fs.readFileSync(boardFile(), "utf8").includes(`reading:${id}`));
+  assert.equal((await fetch(base() + `/api/reading/${id}`, { method: "DELETE", headers: J, body: "{}" })).status, 204);
+  assert.ok(!fs.readFileSync(boardFile(), "utf8").includes(`reading:${id}`));
+});

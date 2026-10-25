@@ -30,6 +30,13 @@ export interface TicketResponse {
   reading: ReadingSummary[];
 }
 
+export interface ReadingItemResponse {
+  item: ReadingItem;
+  noteHtml: string;
+  groomHtml: string;
+  groomPath: string;
+}
+
 export type ReadingCopyKind = "link" | "note" | "both" | "prompt";
 export type ReadingPatch = Partial<{ title: string; url: string; status: string; category: string | null; tickets: string[] }>;
 
@@ -131,6 +138,9 @@ export const api = {
   },
   async readingList(): Promise<ReadingListResponse> {
     return (await request("GET", "/api/reading")).json() as Promise<ReadingListResponse>;
+  },
+  async readingItem(id: string): Promise<ReadingItemResponse> {
+    return (await request("GET", `/api/reading/${encodeURIComponent(id)}`)).json() as Promise<ReadingItemResponse>;
   },
   async addReading(url: string): Promise<{ item: ReadingItem; existed: boolean }> {
     return (await postJson("/api/reading", { url })).json() as Promise<{ item: ReadingItem; existed: boolean }>;

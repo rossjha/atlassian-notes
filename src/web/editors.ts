@@ -31,14 +31,36 @@ export interface NoteEditorOptions {
   rows?: number;
 }
 
+/** Something with a markdown body that an inline editor can save (a ticket note, a reading item's note). */
+export interface EditableDoc {
+  label: string;
+  note: { body: string; mtimeMs: number } | null;
+  save(body: string, baseMtimeMs: number | null, force: boolean): Promise<SaveResult>;
+}
+
 export function editNote(cell: HTMLElement, row: Row, onDone: () => void, options: NoteEditorOptions = {}): void {
+  const doc: EditableDoc = {
+    label: `Note for ${row.ticket.key}`,
+    get note() {
+      return row.note;
+    },
+    async save(body, base, force) {
+      const result = await api.saveNote(row.ticket.key, body, base, force);
+      if (result.kind === "ok") row.note = { body, mtimeMs: result.mtimeMs };
+      return result;
+    },
+  };
+  editMarkdown(cell, doc, onDone, options);
+}
+
+export function editMarkdown(cell: HTMLElement, doc: EditableDoc, onDone: () => void, options: NoteEditorOptions = {}): void {
   const close = begin(onDone);
-  let original = row.note?.body ?? "";
-  let baseMtimeMs: number | null = row.note?.mtimeMs ?? null;
+  let original = doc.note?.body ?? "";
+  let baseMtimeMs: number | null = doc.note?.mtimeMs ?? null;
   let saving = false;
   let finished = false;
 
-  const area = h("textarea", { class: "editor-area", rows: String(options.rows ?? 4), "aria-label": `Note for ${row.ticket.key}` }) as HTMLTextAreaElement;
+  const area = h("textarea", { class: "editor-area", rows: String(options.rows ?? 4), "aria-label": doc.label }) as HTMLTextAreaElement;
   area.value = original;
   const message = h("div", { class: "editor-msg", role: "alert" });
   message.hidden = true;
@@ -73,7 +95,7 @@ export function editNote(cell: HTMLElement, row: Row, onDone: () => void, option
     const text = area.value;
     let result: SaveResult;
     try {
-      result = await api.saveNote(row.ticket.key, text, baseMtimeMs, force);
+      result = await doc.save(text, baseMtimeMs, force);
     } catch (e) {
       saving = false;
       showMessage((e as Error).message, null);
@@ -83,7 +105,6 @@ export function editNote(cell: HTMLElement, row: Row, onDone: () => void, option
     if (result.kind === "ok") {
       baseMtimeMs = result.mtimeMs;
       original = text;
-      row.note = { body: text, mtimeMs: result.mtimeMs };
       message.hidden = true;
       actions.hidden = true;
       if (area.value !== text) {

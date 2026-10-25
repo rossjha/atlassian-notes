@@ -6,6 +6,7 @@ import { copyToClipboard, h, relativeTime, setHtml } from "./dom.ts";
 import { editNote, isEditing } from "./editors.ts";
 import { motionAllowed, motionMs } from "./motion.ts";
 import { groupLinks, sprintLabel } from "./ticketDetails.ts";
+import { closeReadingDrawer } from "./readingDrawer.ts";
 
 export interface DrawerHooks {
   /** The current table row for a key, if it is in the active view. */
@@ -16,6 +17,8 @@ export interface DrawerHooks {
   star?: { isStarred(key: string): boolean; toggle(key: string): void; readonly disabled: boolean; readonly locked?: boolean };
   /** A note was saved in the drawer. `openedFromSearch` is captured when the editor opened. */
   onNoteSavedInDrawer?(key: string, body: string, openedFromSearch: boolean): void;
+  /** Opens a reading item linked to this ticket in the reading panel. */
+  openReading?(id: string): void;
 }
 
 let hooks: DrawerHooks = { getRow: () => undefined, onNoteSaved: () => {} };
@@ -42,6 +45,7 @@ export function currentDrawerKey(): string | null {
 }
 
 export function openDrawer(key: string, opts: { fromSearch?: boolean } = {}): void {
+  closeReadingDrawer(); // one panel at a time
   if (openKey === key && shell) {
     if (!opts.fromSearch) fromSearch = false;
     shell.querySelector<HTMLElement>(".dr-panel")?.focus();
@@ -338,6 +342,16 @@ function groomSection(row: Row | null): HTMLElement {
   return section("Groom", box);
 }
 
+/** Reading list items that link this ticket; hidden when there are none. */
+function readingSection(): HTMLElement | null {
+  const items = payload?.reading ?? [];
+  if (items.length === 0) return null;
+  return section("Reading", h("div", { class: "rd-linked" },
+    ...items.map((r) => h("button", { type: "button", class: "dr-keylink rd-linked-item", title: `Open "${r.title}"`, onclick: () => hooks.openReading?.(r.id) },
+      icon("eyeglasses", "rd-linked-icon"), h("span", { class: "dr-keylink-text" }, r.title), h("span", { class: "pill" }, r.status))),
+  ));
+}
+
 function render(): void {
   if (!shell || !openKey) return;
   const key = openKey;
@@ -381,7 +395,7 @@ function render(): void {
     left.append(h("p", { class: "text-muted" }, "Loading…"));
   }
 
-  const right = h("div", { class: "dr-col" }, noteSection(key, row), groomSection(row));
+  const right = h("div", { class: "dr-col" }, readingSection(), noteSection(key, row), groomSection(row));
   const body = h("div", { class: "dr-body" }, left, right);
   const hadFocus = shell.contains(document.activeElement);
   // Backdrop and panel persist across re-renders, so their entrance animations play once per open, not on every refetch.

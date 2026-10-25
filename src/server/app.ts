@@ -8,14 +8,14 @@ import { BoardOpError } from "./board.ts";
 import { BOARD_CACHE_ID, type BoardService } from "./boardService.ts";
 import { ConfigFileError, DEFAULT_READING_CONFIG, loadColumns, loadLinks, loadReadingConfig, loadViews, saveViews, validateViews } from "./configFiles.ts";
 import { bothMarkdown, groomPrompt, readingBothMarkdown, readingLinkMarkdown, readingPrompt, ticketMarkdown } from "./copyText.ts";
-import { InvalidKeyError, isValidKey } from "./frontMatter.ts";
+import { InvalidKeyError, isValidKey, parseFrontMatter } from "./frontMatter.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
 import { renderMarkdownSafe } from "./markdown.ts";
 import { atomicWrite, type NotesStore, type WriteResult } from "./notesStore.ts";
 import { buildRow } from "./rows.ts";
 import type { Refresher } from "./refresher.ts";
 import { InvalidReadingIdError, InvalidUrlError, type ReadingPatch, type ReadingStore } from "./readingStore.ts";
-import { isReadingId } from "../shared/reading.ts";
+import { isReadingId, readingCardKey } from "../shared/reading.ts";
 import type { ReadingConfig } from "../shared/types.ts";
 
 export interface AppDeps {
@@ -264,6 +264,18 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     }
     if (!id) return false;
     requireReadingId(id);
+    if (segs.length === 2 && method === "GET") {
+      const item = await reading.read(id);
+      if (!item) throw new HttpError(404, "No such reading item");
+      const groom = await fs.readFile(reading.groomPath(id), "utf8").catch(() => null);
+      send(res, 200, {
+        item,
+        noteHtml: item.note ? renderMarkdownSafe(item.note) : "",
+        groomHtml: groom === null ? "" : renderMarkdownSafe(parseFrontMatter(groom).body),
+        groomPath: reading.groomPath(id),
+      });
+      return true;
+    }
     if (segs.length === 2 && method === "PUT") {
       const patch = parseReadingPatch(await readJson(req));
       let cfg: ReadingConfig;
@@ -288,6 +300,11 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     }
     if (segs.length === 2 && method === "DELETE") {
       if (!(await reading.remove(id))) throw new HttpError(404, "No such reading item");
+      try {
+        await board.apply({ op: "remove", key: readingCardKey(id) });
+      } catch (err) {
+        console.error(`reading delete: removing ${id} from the Kanban failed:`, err instanceof Error ? err.message : err);
+      }
       send(res, 204);
       return true;
     }

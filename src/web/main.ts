@@ -23,6 +23,7 @@ import { applySavedTheme, currentTheme, saveTheme, THEMES } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
 import { initPalette } from "./palette.ts";
 import { clearReadingUrl, renderReading, type ReadingTabState } from "./reading.ts";
+import { configureReadingDrawer, openReadingDrawer, readingDrawerOnLive, readingDrawerSyncStar } from "./readingDrawer.ts";
 import type { ReadingSortKey } from "../shared/reading.ts";
 import type { PaletteCommand } from "../shared/palette.ts";
 
@@ -165,6 +166,27 @@ configureDrawer({
     },
   },
   onNoteSavedInDrawer: noteImpliesDoing,
+  openReading: (id) => openReadingDrawer(id),
+});
+configureReadingDrawer({
+  getItem: (id) => readingItems.find((i) => i.id === id),
+  config: () => readingConfig,
+  lockedReason: () => readingConfigError,
+  star: {
+    isStarred: (k) => boardKeys.has(k),
+    toggle: toggleStar,
+    get disabled() {
+      return !boardReady || boardLocked;
+    },
+    get locked() {
+      return boardReady && boardLocked;
+    },
+  },
+  onChanged: () => {
+    void loadReading();
+    if (activeId === BOARD_TAB) void loadBoard();
+  },
+  openTicket: (key) => openDrawer(key),
 });
 function boardRow(key: string): Row | undefined {
   if (!boardData) return undefined;
@@ -759,6 +781,7 @@ const boardHandlers: BoardHandlers = {
 
 function renderBody(): void {
   drawerSyncStar(); // the drawer's ★ follows the board even while a table render is deferred
+  readingDrawerSyncStar();
   // Never rebuild the table under an open editor; apply the latest state once it closes.
   if (isEditing() || isDragging() || isColumnDragging()) {
     renderDeferred = true;
@@ -914,8 +937,12 @@ function onLive(e: LiveEvent): void {
       break;
     case "reading":
     case "readingGroom":
-    case "readingConfig":
+      readingDrawerOnLive(e.id);
       if (activeId === READING_TAB) void loadReading();
+      if (activeId === BOARD_TAB) void loadBoard();
+      break;
+    case "readingConfig":
+      void loadReading();
       if (activeId === BOARD_TAB) void loadBoard();
       break;
   }
@@ -990,10 +1017,8 @@ async function loadReading(): Promise<void> {
   }
 }
 
-/** The reading side panel arrives with the next change; until then a row opens its link. */
 function openReading(id: string): void {
-  const item = readingItems.find((i) => i.id === id);
-  if (item?.url) window.open(item.url, "_blank", "noopener,noreferrer");
+  openReadingDrawer(id);
 }
 
 async function addReading(url: string): Promise<void> {
@@ -1088,3 +1113,4 @@ connectLive(onLive);
 void loadConfig();
 void loadOrphans();
 void loadBoard();
+void loadReading(); // the reading panel can open from any tab (a ticket's Reading section), so its config is needed early
