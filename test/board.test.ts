@@ -176,3 +176,11 @@ test("parseBoard upper-cases and trims hand-typed keys (deduping after normalisi
 test("ticket files are ignored by the watcher", () => {
   assert.equal(eventForPath("jira/tickets/AAA-1.md"), null);
 });
+
+test("eventForPath maps reading items, reading groom files and reading.yaml", () => {
+  assert.deepEqual(eventForPath("reading/items/2026-10-25-a.md"), { type: "reading", id: "2026-10-25-a" });
+  assert.deepEqual(eventForPath("reading/groom/2026-10-25-a.md"), { type: "readingGroom", id: "2026-10-25-a" });
+  assert.deepEqual(eventForPath("reading.yaml"), { type: "readingConfig" });
+  assert.equal(eventForPath("reading/items/Bad Id.md"), null);
+  assert.equal(eventForPath(".cache/trash/reading/2026-10-25-a.1.md"), null);
+});

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bothMarkdown, groomPrompt, ticketMarkdown } from "../src/server/copyText.ts";
-import type { GroomFile, IssueDetail, NoteFile } from "../src/shared/types.ts";
+import { bothMarkdown, groomPrompt, readingBothMarkdown, readingLinkMarkdown, readingPrompt, ticketMarkdown } from "../src/server/copyText.ts";
+import type { GroomFile, IssueDetail, NoteFile, ReadingItem } from "../src/shared/types.ts";
 
 const base: IssueDetail = {
   ticket: {
@@ -59,4 +59,30 @@ test("groomPrompt with the default template contains key and groom path", () => 
   assert.ok(out.includes("PAY-412"));
   assert.ok(out.includes("/n/jira/groom/PAY-412.md"));
   assert.ok(!out.includes("{"));
+});
+
+const readingItem: ReadingItem = {
+  id: "2026-10-25-retry", url: "https://acme.example/wiki/x", title: "Retry strategy", status: "Open questions", source: "confluence",
+  category: "RFC", tickets: ["PAY-40", "PAY-412"], created: "2026-10-25T10:00:00.000Z", updated: "2026-10-25T11:00:00.000Z",
+  mtimeMs: 0, note: "In my words: retries move to a workflow.\n", groom: null, parseError: null,
+};
+
+test("readingLinkMarkdown is a markdown link", () => {
+  assert.equal(readingLinkMarkdown(readingItem), "[Retry strategy](https://acme.example/wiki/x)");
+});
+
+test("readingBothMarkdown without and with a Claude summary", () => {
+  const head = "# Retry strategy\nhttps://acme.example/wiki/x\n\n- Status: Open questions\n- Category: RFC\n- Tickets: PAY-40, PAY-412\n\n## My note\nIn my words: retries move to a workflow.\n";
+  assert.equal(readingBothMarkdown(readingItem, null), head);
+  assert.equal(
+    readingBothMarkdown({ ...readingItem, category: null, tickets: [], note: "" }, "Key ideas\n"),
+    "# Retry strategy\nhttps://acme.example/wiki/x\n\n- Status: Open questions\n- Category: –\n- Tickets: none\n\n## My note\n_None_\n\n## Claude summary\nKey ideas\n",
+  );
+});
+
+test("readingPrompt fills every placeholder", () => {
+  assert.equal(
+    readingPrompt("{url}|{title}|{tickets}|{groomPath}|{notePath}", { url: "u", title: "t", tickets: "none", groomPath: "g", notePath: "n" }),
+    "u|t|none|g|n",
+  );
 });

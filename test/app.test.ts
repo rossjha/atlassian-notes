@@ -10,6 +10,7 @@ import { ViewCache } from "../src/server/cache.ts";
 import { NotesStore } from "../src/server/notesStore.ts";
 import { Refresher } from "../src/server/refresher.ts";
 import { BoardService } from "../src/server/boardService.ts";
+import { ReadingStore } from "../src/server/readingStore.ts";
 import { ensureDataDir, loadColumns, loadViews } from "../src/server/configFiles.ts";
 import type { Config } from "../src/server/config.ts";
 import type { JiraClient } from "../src/server/jira.ts";
@@ -68,7 +69,7 @@ before(async () => {
     onChange: (e) => broadcast(e),
   });
   boardRef = board;
-  const app = createApp({ config, jira, notes, cache, refresher, board, publicDir });
+  const app = createApp({ config, jira, notes, cache, refresher, board, reading: new ReadingStore(dir), publicDir });
   broadcast = app.broadcast;
   server = app.server;
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -530,4 +531,111 @@ test("scratchpad: a corrupt file is reported, never overwritten", async () => {
   assert.equal((await put("/api/scratchpad", scene)).status, 409);
   assert.equal(fs.readFileSync(file, "utf8"), "{broken");
   fs.rmSync(file);
+});
+
+// ---- reading list ----
+const CONF_URL = "https://acme.example/wiki/spaces/PAY/pages/1/Retry+strategy";
+const postReading = (body: unknown, headers: Record<string, string> = J) =>
+  fetch(base() + "/api/reading", { method: "POST", headers, body: JSON.stringify(body) });
+
+test("POST /api/reading adds an item, and a second POST of the same URL returns existed: true", async () => {
+  const first = await postReading({ url: CONF_URL });
+  assert.equal(first.status, 201);
+  const a = await first.json();
+  assert.equal(a.existed, false);
+  assert.equal(a.item.title, "Retry strategy");
+  assert.equal(a.item.status, "Pending");
+  const second = await postReading({ url: `${CONF_URL}/` });
+  assert.equal(second.status, 200);
+  const b = await second.json();
+  assert.equal(b.existed, true);
+  assert.equal(b.item.id, a.item.id);
+  const list = await (await fetch(base() + "/api/reading")).json();
+  assert.equal(list.items.filter((i: { url: string }) => i.url === CONF_URL).length, 1);
+  assert.deepEqual(list.config.statuses, ["Pending", "Open questions", "Complete"]);
+  assert.equal(list.error, null);
+  const bad = await postReading({ url: "ftp://x" });
+  assert.equal(bad.status, 400);
+  assert.equal((await bad.json()).error, "Enter a link starting with http:// or https://");
+});
+
+test("POST /api/reading without the JSON content type is 415", async () => {
+  const res = await postReading({ url: CONF_URL }, { "Content-Type": "text/plain" });
+  assert.equal(res.status, 415);
+});
+
+async function addItem(url: string): Promise<string> {
+  return (await (await postReading({ url })).json()).item.id;
+}
+
+test("PUT /api/reading/<id> sets status and tickets; a status not in reading.yaml is 400", async () => {
+  const id = await addItem("https://example.com/put-fields");
+  const ok = await put(`/api/reading/${id}`, { status: "Complete", tickets: ["pay-1"], category: "RFC" });
+  assert.equal(ok.status, 200);
+  assert.equal(typeof (await ok.json()).mtimeMs, "number");
+  const item = (await (await fetch(base() + "/api/reading")).json()).items.find((i: { id: string }) => i.id === id);
+  assert.equal(item.status, "Complete");
+  assert.deepEqual(item.tickets, ["PAY-1"]);
+  assert.equal(item.category, "RFC");
+  assert.equal((await put(`/api/reading/${id}`, { status: "Nope" })).status, 400);
+  assert.equal((await put(`/api/reading/${id}`, { category: "Nope" })).status, 400);
+  assert.equal((await put(`/api/reading/${id}`, { tickets: ["not a key"] })).status, 400);
+  assert.equal((await put("/api/reading/no-such-item", { status: "Complete" })).status, 404);
+  assert.equal((await put("/api/reading/Bad%20Id", { status: "Complete" })).status, 400);
+});
+
+test("PUT /api/reading/<id>/note conflict returns 409 with current", async () => {
+  const id = await addItem("https://example.com/note-conflict");
+  const ok = await put(`/api/reading/${id}/note`, { body: "first", baseMtimeMs: null, force: true });
+  assert.equal(ok.status, 200);
+  const stale = await put(`/api/reading/${id}/note`, { body: "second", baseMtimeMs: 1 });
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).current.body, "first");
+});
+
+test("DELETE /api/reading/<id> moves it to the trash; a second DELETE is 404", async () => {
+  const id = await addItem("https://example.com/delete-me");
+  const del = () => fetch(base() + `/api/reading/${id}`, { method: "DELETE", headers: J, body: "{}" });
+  assert.equal((await del()).status, 204);
+  assert.ok(!fs.existsSync(path.join(dir, "reading", "items", `${id}.md`)));
+  assert.ok(fs.readdirSync(path.join(dir, ".cache", "trash", "reading")).some((n) => n.startsWith(`${id}.`)));
+  assert.equal((await del()).status, 404);
+});
+
+test("GET /api/reading/<id>/copy/prompt fills url, title, tickets, groomPath and notePath", async () => {
+  const id = await addItem("https://example.com/copy-me");
+  await put(`/api/reading/${id}`, { tickets: ["PAY-1", "PAY-2"] });
+  const text = await (await fetch(base() + `/api/reading/${id}/copy/prompt`)).text();
+  assert.ok(text.includes("https://example.com/copy-me"), text);
+  assert.ok(text.includes("(example.com: copy-me)"), text);
+  assert.ok(text.includes("PAY-1, PAY-2"), text);
+  assert.ok(text.includes(path.join(dir, "reading", "groom", `${id}.md`)), text);
+  assert.ok(text.includes(path.join(dir, "reading", "items", `${id}.md`)), text);
+  assert.equal(await (await fetch(base() + `/api/reading/${id}/copy/link`)).text(), "[example.com: copy-me](https://example.com/copy-me)");
+  assert.equal((await fetch(base() + `/api/reading/${id}/copy/nope`)).status, 400);
+});
+
+test("GET /api/tickets/PAY-1 includes reading items that link PAY-1", async () => {
+  const id = await addItem("https://example.com/linked-to-pay-1");
+  await put(`/api/reading/${id}`, { tickets: ["PAY-1"] });
+  const body = await (await fetch(base() + "/api/tickets/PAY-1")).json();
+  assert.ok(body.reading.some((r: { id: string }) => r.id === id), JSON.stringify(body.reading));
+});
+
+test("SSE delivers a reading event when a reading item file is written", async () => {
+  const ac = new AbortController();
+  const res = await fetch(base() + "/api/events", { signal: ac.signal });
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  setTimeout(() => fs.writeFileSync(path.join(dir, "reading", "items", "2026-10-25-sse.md"), "---\ntitle: x\n---\n"), 100);
+  let buf = "";
+  const want = 'data: {"type":"reading","id":"2026-10-25-sse"}';
+  const deadline = Date.now() + 2000;
+  while (!buf.includes(want) && Date.now() < deadline) {
+    const r = await Promise.race([reader.read(), new Promise<null>((r) => setTimeout(() => r(null), 2000))]);
+    if (!r || r.done) break;
+    buf += decoder.decode(r.value);
+  }
+  ac.abort();
+  assert.ok(buf.includes(want), buf);
 });

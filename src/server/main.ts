@@ -11,6 +11,7 @@ import { ConfigError, loadConfig, type Config } from "./config.ts";
 import { ensureDataDir, loadColumns, loadViews } from "./configFiles.ts";
 import { createJiraClient, type JiraClient } from "./jira.ts";
 import { NotesStore } from "./notesStore.ts";
+import { ReadingStore } from "./readingStore.ts";
 import { Refresher } from "./refresher.ts";
 import { createTicketFileSyncer, syncTicketFiles } from "./ticketFiles.ts";
 import { watchNotesDir } from "./watcher.ts";
@@ -102,7 +103,8 @@ async function main(): Promise<void> {
     onChange: (e) => broadcast(e),
     statePath: path.join(config.notesDir, ".cache", "reconcile.json"),
   });
-  const app = createApp({ config, jira, notes, cache, refresher, board, publicDir: path.join(root, "public") });
+  const reading = new ReadingStore(config.notesDir);
+  const app = createApp({ config, jira, notes, cache, refresher, board, reading, publicDir: path.join(root, "public") });
   broadcast = app.broadcast;
 
   await new Promise<void>((resolve, reject) => {

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import type { LiveEvent } from "../shared/types.ts";
+import { isReadingId } from "../shared/reading.ts";
 import { isValidKey } from "./frontMatter.ts";
 
 const DEBOUNCE_MS = 150;
@@ -11,6 +12,9 @@ export function eventForPath(rel: string): LiveEvent | null {
   if (p === "columns.yaml") return { type: "columns" };
   if (p === "board.yaml") return { type: "board" };
   if (p === "links.yaml") return { type: "links" };
+  if (p === "reading.yaml") return { type: "readingConfig" };
+  const r = /^reading\/(items|groom)\/(.+)\.md$/.exec(p);
+  if (r && isReadingId(r[2])) return { type: r[1] === "items" ? "reading" : "readingGroom", id: r[2] };
   const m = /^jira\/(notes|groom)\/(.+)\.md$/.exec(p);
   if (m && isValidKey(m[2])) return { type: m[1] === "notes" ? "note" : "groom", key: m[2] };
   return null;

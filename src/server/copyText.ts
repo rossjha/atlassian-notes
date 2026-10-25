@@ -1,4 +1,4 @@
-import type { GroomFile, IssueDetail, NoteFile } from "../shared/types.ts";
+import type { GroomFile, IssueDetail, NoteFile, ReadingItem } from "../shared/types.ts";
 
 export function ticketMarkdown(d: IssueDetail): string {
   const t = d.ticket;
@@ -23,4 +23,28 @@ export function groomPrompt(template: string, vars: { key: string; url: string; 
     .replaceAll("{key}", () => vars.key)
     .replaceAll("{url}", () => vars.url)
     .replaceAll("{groomPath}", () => vars.groomPath);
+}
+
+export function readingLinkMarkdown(item: ReadingItem): string {
+  return `[${item.title}](${item.url})`;
+}
+
+export function readingBothMarkdown(item: ReadingItem, groomBody: string | null): string {
+  let out =
+    `# ${item.title}\n${item.url}\n\n- Status: ${item.status}\n- Category: ${item.category ?? "–"}\n` +
+    `- Tickets: ${item.tickets.length ? item.tickets.join(", ") : "none"}\n\n## My note\n${item.note || "_None_\n"}`;
+  if (groomBody !== null) out += `\n## Claude summary\n${groomBody}`;
+  return out;
+}
+
+export function readingPrompt(
+  template: string,
+  vars: { url: string; title: string; tickets: string; groomPath: string; notePath: string },
+): string {
+  return template
+    .replaceAll("{url}", () => vars.url)
+    .replaceAll("{title}", () => vars.title)
+    .replaceAll("{tickets}", () => vars.tickets)
+    .replaceAll("{groomPath}", () => vars.groomPath)
+    .replaceAll("{notePath}", () => vars.notePath);
 }

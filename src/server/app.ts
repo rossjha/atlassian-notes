@@ -6,14 +6,17 @@ import type { ViewCache } from "./cache.ts";
 import type { Config } from "./config.ts";
 import { BoardOpError } from "./board.ts";
 import { BOARD_CACHE_ID, type BoardService } from "./boardService.ts";
-import { ConfigFileError, loadColumns, loadLinks, loadViews, saveViews, validateViews } from "./configFiles.ts";
-import { bothMarkdown, groomPrompt, ticketMarkdown } from "./copyText.ts";
+import { ConfigFileError, DEFAULT_READING_CONFIG, loadColumns, loadLinks, loadReadingConfig, loadViews, saveViews, validateViews } from "./configFiles.ts";
+import { bothMarkdown, groomPrompt, readingBothMarkdown, readingLinkMarkdown, readingPrompt, ticketMarkdown } from "./copyText.ts";
 import { InvalidKeyError, isValidKey } from "./frontMatter.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
 import { renderMarkdownSafe } from "./markdown.ts";
 import { atomicWrite, type NotesStore, type WriteResult } from "./notesStore.ts";
 import { buildRow } from "./rows.ts";
 import type { Refresher } from "./refresher.ts";
+import { InvalidReadingIdError, InvalidUrlError, type ReadingPatch, type ReadingStore } from "./readingStore.ts";
+import { isReadingId } from "../shared/reading.ts";
+import type { ReadingConfig } from "../shared/types.ts";
 
 export interface AppDeps {
   config: Config;
@@ -22,6 +25,7 @@ export interface AppDeps {
   cache: ViewCache;
   refresher: Refresher;
   board: BoardService;
+  reading: ReadingStore;
   publicDir: string;
 }
 
@@ -60,7 +64,7 @@ class HttpError extends Error {
 }
 
 export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: LiveEvent) => void } {
-  const { config, jira, notes, cache, refresher, board } = deps;
+  const { config, jira, notes, cache, refresher, board, reading } = deps;
   const publicDir = path.resolve(deps.publicDir);
   const clients = new Set<http.ServerResponse>();
 
@@ -205,6 +209,121 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     }
   }
 
+  function requireReadingId(id: string): void {
+    if (!isReadingId(id)) throw new HttpError(400, "Invalid reading id");
+  }
+
+  /** reading.yaml, or the defaults plus the error while the file is broken. */
+  async function readingConfig(): Promise<{ config: ReadingConfig; error: string | null }> {
+    try {
+      return { config: await loadReadingConfig(config.notesDir), error: null };
+    } catch (err) {
+      if (!(err instanceof ConfigFileError)) throw err;
+      return { config: DEFAULT_READING_CONFIG, error: err.message };
+    }
+  }
+
+  function parseReadingPatch(body: Record<string, unknown>): ReadingPatch {
+    const bad = (m: string) => new HttpError(400, m);
+    const patch: ReadingPatch = {};
+    for (const k of ["title", "url", "status"] as const) {
+      if (body[k] === undefined) continue;
+      if (typeof body[k] !== "string") throw bad(`${k} must be a string`);
+      patch[k] = body[k] as string;
+    }
+    if (body.category !== undefined) {
+      if (body.category !== null && typeof body.category !== "string") throw bad("category must be a string or null");
+      patch.category = body.category as string | null;
+    }
+    if (body.tickets !== undefined) {
+      if (!Array.isArray(body.tickets) || !body.tickets.every((t) => typeof t === "string")) throw bad("tickets must be a list of keys");
+      patch.tickets = body.tickets as string[];
+    }
+    return patch;
+  }
+
+  async function readingRoute(req: http.IncomingMessage, res: http.ServerResponse, method: string, segs: string[]): Promise<boolean> {
+    const [, id, c, d] = segs;
+    if (segs.length === 1 && method === "GET") {
+      const { config: cfg, error } = await readingConfig();
+      send(res, 200, { items: await reading.list(), config: cfg, error });
+      return true;
+    }
+    if (segs.length === 1 && method === "POST") {
+      const body = await readJson(req);
+      if (typeof body.url !== "string") throw new HttpError(400, "url must be a string");
+      const { config: cfg } = await readingConfig();
+      try {
+        const r = await reading.add(body.url, { jiraBaseUrl: config.jiraBaseUrl, defaultStatus: cfg.statuses[0], now: new Date() });
+        send(res, r.existed ? 200 : 201, r);
+      } catch (err) {
+        if (err instanceof InvalidUrlError) throw new HttpError(400, err.message);
+        throw err;
+      }
+      return true;
+    }
+    if (!id) return false;
+    requireReadingId(id);
+    if (segs.length === 2 && method === "PUT") {
+      const patch = parseReadingPatch(await readJson(req));
+      let cfg: ReadingConfig;
+      try {
+        cfg = await loadReadingConfig(config.notesDir);
+      } catch (err) {
+        if (err instanceof ConfigFileError) throw new HttpError(409, `${err.message} — fix the file before changing items`);
+        throw err;
+      }
+      if (patch.status !== undefined && !cfg.statuses.includes(patch.status)) throw new HttpError(400, `Unknown status "${patch.status}"`);
+      if (patch.category !== undefined && patch.category !== null && !cfg.categories.includes(patch.category)) {
+        throw new HttpError(400, `Unknown category "${patch.category}"`);
+      }
+      if (!(await reading.read(id))) throw new HttpError(404, "No such reading item");
+      try {
+        sendWrite(res, await reading.setFields(id, patch));
+      } catch (err) {
+        if (err instanceof InvalidUrlError) throw new HttpError(400, err.message);
+        throw err;
+      }
+      return true;
+    }
+    if (segs.length === 2 && method === "DELETE") {
+      if (!(await reading.remove(id))) throw new HttpError(404, "No such reading item");
+      send(res, 204);
+      return true;
+    }
+    if (segs.length === 3 && c === "note" && method === "PUT") {
+      const body = await readJson(req);
+      if (typeof body.body !== "string") throw new HttpError(400, "body must be a string");
+      const base = body.baseMtimeMs ?? null;
+      if (base !== null && typeof base !== "number") throw new HttpError(400, "baseMtimeMs must be a number or null");
+      if (!(await reading.read(id))) throw new HttpError(404, "No such reading item");
+      sendWrite(res, await reading.writeNote(id, body.body, { baseMtimeMs: base, force: body.force === true }));
+      return true;
+    }
+    if (segs.length === 4 && c === "copy" && d && method === "GET") {
+      if (!["link", "note", "both", "prompt"].includes(d)) throw new HttpError(400, "Unknown copy kind");
+      const item = await reading.read(id);
+      if (!item) throw new HttpError(404, "No such reading item");
+      if (d === "link") sendText(res, 200, readingLinkMarkdown(item));
+      else if (d === "note") sendText(res, 200, item.note);
+      else if (d === "both") {
+        const groom = await fs.readFile(reading.groomPath(id), "utf8").catch(() => null);
+        sendText(res, 200, readingBothMarkdown(item, groom));
+      } else {
+        const { config: cfg } = await readingConfig();
+        sendText(res, 200, readingPrompt(cfg.groomPrompt, {
+          url: item.url,
+          title: item.title,
+          tickets: item.tickets.length ? item.tickets.join(", ") : "none",
+          groomPath: reading.groomPath(id),
+          notePath: reading.notePath(id),
+        }));
+      }
+      return true;
+    }
+    return false;
+  }
+
   async function api(req: http.IncomingMessage, res: http.ServerResponse, method: string, segs: string[]): Promise<void> {
     // segs excludes the leading "api"
     const [a, b, c, d, e] = segs;
@@ -286,6 +405,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
         groom,
         groomHtml: groom ? renderMarkdownSafe(groom.body) : "",
         groomPath: notes.groomPath(key),
+        reading: (await reading.ticketIndex()).get(key) ?? [],
       });
     }
     if (a === "tickets" && b && c === "copy" && d && segs.length === 4 && method === "GET") {
@@ -331,6 +451,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       if (body.value !== null && typeof body.value !== "string") throw new HttpError(400, "value must be a string or null");
       return sendWrite(res, await notes.setNoteField(b, d, body.value, await jiraIdFor(b)));
     }
+    if (a === "reading" && (await readingRoute(req, res, method, segs))) return;
     if (a === "scratchpad" && segs.length === 1 && method === "GET") {
       return send(res, 200, await readScratchpad());
     }
@@ -421,6 +542,9 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       if (err instanceof InvalidKeyError) {
         status = 400;
         message = "Invalid ticket key";
+      } else if (err instanceof InvalidReadingIdError) {
+        status = 400;
+        message = "Invalid reading id";
       } else if (err instanceof ConfigFileError) {
         message = err.message;
       } else {
