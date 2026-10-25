@@ -108,7 +108,10 @@ searchForm.addEventListener("submit", (e) => {
 });
 const tabIndicatorEl = h("span", { class: "tab-indicator", "aria-hidden": "true" });
 tabIndicatorEl.hidden = true;
-const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm, themePickerButton(), tabIndicatorEl);
+/** links.yaml links: right of the ticket search, before the theme button, after a divider. */
+const navLinksEl = h("div", { class: "nav-links" });
+navLinksEl.hidden = true;
+const tabsEl = h("nav", { class: "tabs" }, tabsListEl, searchForm, navLinksEl, themePickerButton(), tabIndicatorEl);
 const rowsCache = new Map<string, { rows: Row[]; fetchedAt: string | null; error: string | null }>();
 const headerEl = h("div", { class: "view-header" });
 const errorEl = h("div", { class: "error-bar", role: "alert" });
@@ -464,10 +467,11 @@ function renderTabs(): void {
     h("span", { class: `tab-wrap${onScratch ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onScratch ? " active" : ""}`, title: "Scratchpad", "aria-label": "Scratchpad", onclick: () => selectTab(SCRATCH_TAB) }, icon("paintBrush", "tab-svg")),
     ),
-    ...navLinks.map(navLinkTab),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...viewTabs,
   );
+  navLinksEl.replaceChildren(...(navLinks.length ? [h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"), ...navLinks.map(navLinkTab)] : []));
+  navLinksEl.hidden = navLinks.length === 0;
   if (!locked) {
     tabsListEl.append(h("button", { type: "button", class: "icon-btn tab-add", title: "Add view", "aria-label": "Add view", onclick: () => editView(null) }, icon("plusCircle", "icon-btn-svg")));
     attachTabDrag(viewTabs, views.map((v) => v.id), moveViewTab, () => {
@@ -478,7 +482,7 @@ function renderTabs(): void {
   placeTabIndicator();
 }
 
-/** A links.yaml link, beside Kanban and Scratchpad: its icon, or its name when it has none. */
+/** A links.yaml link in the top bar's right-hand group: its icon, or its name when it has none. */
 function navLinkTab(l: NavLink): HTMLElement {
   const label = l.newTab ? `${l.name} (opens in a new tab)` : l.name;
   const body = l.icon === null

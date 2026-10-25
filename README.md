@@ -127,7 +127,7 @@ To wire up your own Claude skill (for example `groom-work-item`), add this line 
 
 ## Top-bar links
 
-Add your own links (a roadmap tool, a wiki, dashboards) next to Kanban and Scratchpad with a `links.yaml` in your notes folder. Copy `examples/links.example.yaml` to start: each link has a `name`, a `url` (https or http only), an optional `icon` (a built-in name such as `map`, `book` or `chart`, or an emoji; without one the button shows the name) and an optional `newTab` (default `true`). Changes show up straight away; a bad entry is skipped with a warning and the rest still show. The app never contacts these sites itself: it only opens them when you click.
+Add your own links (a roadmap tool, a wiki, dashboards) to the right of the ticket search with a `links.yaml` in your notes folder. Copy `examples/links.example.yaml` to start: each link has a `name`, a `url` (https or http only), an optional `icon` (a built-in name such as `map`, `book` or `chart`, or an emoji; without one the button shows the name) and an optional `newTab` (default `true`). Changes show up straight away; a bad entry is skipped with a warning and the rest still show. The app never contacts these sites itself: it only opens them when you click.
 
 ## Scratchpad
 
