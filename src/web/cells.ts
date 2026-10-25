@@ -24,8 +24,12 @@ function copyPromptLink(key: string): HTMLElement {
   return link;
 }
 
+/** One line, ellipsised at the column's width (or a default cap while unsized); the full text is the tooltip. */
 function plain(text: string | number | null, cls = ""): HTMLElement {
-  return h("span", { class: cls }, text === null ? "" : String(text));
+  const value = text === null ? "" : String(text);
+  const el = h("span", { class: `cell-text ${cls}`.trim() }, value);
+  if (value) el.title = value;
+  return el;
 }
 
 export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsConfig): HTMLElement {
@@ -34,10 +38,8 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
     case "key":
       return h("a", { href: t.url, class: "key", "data-open": t.key }, t.key);
     case "summary": {
-      // One line, ellipsised at ~45 characters (or at the column's width once sized); the full text is the tooltip.
-      const el = plain(t.summary, "cell-summary");
-      el.title = t.summary;
-      return el;
+      // Summary gets a wider default cap (~45 characters) than other text cells.
+      return plain(t.summary, "cell-summary");
     }
     case "status":
       return h("span", { class: `pill cat-${t.statusCategory.replace(/\W+/g, "-").toLowerCase()}` }, t.status);
@@ -46,7 +48,7 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
     case "labels":
       return h("span", { class: "labels" }, ...t.labels.map((l) => h("span", { class: "pill" }, l)));
     case "updated":
-      return h("span", { class: "text-muted", title: t.updated }, relativeTime(t.updated));
+      return h("span", { class: "cell-text text-muted", title: t.updated }, relativeTime(t.updated));
     case "note": {
       const box = h("div", { class: `note-box ${setting.display === "expand" ? "cell-wrap" : "cell-clip"}` }, row.note ? row.note.body : null);
       if (!row.note) box.classList.add("note-empty");
@@ -76,7 +78,7 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
     case "groomed": {
       const ms = cellValue(row, setting.id);
       if (typeof ms !== "number") return plain(null);
-      return h("span", { class: "text-muted", title: new Date(ms).toLocaleString() }, relativeTime(new Date(ms).toISOString()));
+      return h("span", { class: "cell-text text-muted", title: new Date(ms).toLocaleString() }, relativeTime(new Date(ms).toISOString()));
     }
     default: {
       const def = columns.custom[setting.id];

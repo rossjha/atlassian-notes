@@ -173,8 +173,10 @@ body {
      min-content can't widen the column; the specified width then holds whether wider or narrower than the
      content. This also lifts the automatic note/groom caps below: the content follows the column width.
      Overflowing nowrap text (keys, pills, header labels) ellipsises. */
-  .cell-summary { display: block; max-width: 45ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ticket-grid td.col-sized > .cell-summary { max-width: calc(var(--col-w) - 1rem); }
+  .cell-text { display: block; max-width: 30ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell-summary { max-width: 45ch; }
+  .ticket-grid td.col-sized > .cell-text { max-width: calc(var(--col-w) - 1rem); }
+  .ticket-grid td.col-sized > .key { display: block; overflow: hidden; text-overflow: ellipsis; }
   .ticket-grid .col-sized { width: var(--col-w); min-width: var(--col-w); max-width: var(--col-w); }
   .ticket-grid td.col-sized { overflow: hidden; overflow-wrap: anywhere; text-overflow: ellipsis; }
   .ticket-grid td.col-sized > * { max-width: calc(var(--col-w) - 1rem); }
