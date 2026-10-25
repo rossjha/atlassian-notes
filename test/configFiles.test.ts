@@ -86,7 +86,7 @@ test("custom column clashing with a builtin rejects on columns.yaml", async () =
   });
 });
 
-test("unknown column ids are dropped with a warning; unknown filter keys reject", async (t) => {
+test("unknown column ids and filter keys are dropped with a warning", async (t) => {
   await ensureDataDir(dir, "PAY", examples);
   const columns = await loadColumns(dir);
   const warn = t.mock.method(console, "warn", () => {});
@@ -96,9 +96,10 @@ test("unknown column ids are dropped with a warning; unknown filter keys reject"
   assert.equal(warn.mock.callCount(), 1);
   await fs.writeFile(
     path.join(dir, "views.yaml"),
-    "views:\n  - {id: a, name: A, jql: x, columns: [], filters: {status: {op: empty}}}\n",
+    "views:\n  - {id: a, name: A, jql: x, columns: [], filters: {status: {op: empty}, renamedAway: {op: oneOf, values: [x]}}}\n",
   );
-  await assert.rejects(loadViews(dir, columns), ConfigFileError);
+  assert.deepEqual((await loadViews(dir, columns))[0].filters, {});
+  assert.equal(warn.mock.callCount(), 3);
 });
 
 test("saveViews then loadViews round-trips", async () => {
@@ -132,7 +133,7 @@ test("prototype property names are not treated as custom columns", async (t) => 
     path.join(dir, "views.yaml"),
     "views:\n  - {id: a, name: A, jql: x, columns: [], filters: {toString: {op: empty}}}\n",
   );
-  await assert.rejects(loadViews(dir, columns), ConfigFileError);
+  assert.deepEqual((await loadViews(dir, columns))[0].filters, {});
   await fs.writeFile(path.join(dir, "columns.yaml"), "custom:\n  __proto__:\n    label: P\n    type: text\n");
   await assert.rejects(loadColumns(dir), ConfigFileError);
 });

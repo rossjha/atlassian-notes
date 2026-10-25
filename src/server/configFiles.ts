@@ -188,7 +188,11 @@ export function validateViews(
     const rawFilters = rv.filters ?? {};
     if (!isObj(rawFilters)) throw new ConfigFileError(file, `view "${id}" filters must be a mapping`);
     for (const [col, fv] of Object.entries(rawFilters)) {
-      if (!Object.hasOwn(columns.custom, col)) throw new ConfigFileError(file, `view "${id}" filters on "${col}", which is not a custom column`);
+      // A filter left behind by a renamed or removed custom column is dropped, like an unknown column above.
+      if (!Object.hasOwn(columns.custom, col)) {
+        console.warn(`${file}: view "${id}" ignores filter on unknown column "${col}"`);
+        continue;
+      }
       filters[col] = parseFilter(file, col, fv);
     }
     return { id, name, jql, limit, columns: cols, filters };
