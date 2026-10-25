@@ -8,7 +8,7 @@ import { createApp } from "./app.ts";
 import { BoardService } from "./boardService.ts";
 import { ViewCache } from "./cache.ts";
 import { ConfigError, loadConfig, type Config } from "./config.ts";
-import { ensureDataDir, loadColumns, loadViews } from "./configFiles.ts";
+import { ensureDataDir, loadColumns, loadReadingConfig, loadViews } from "./configFiles.ts";
 import { createJiraClient, type JiraClient } from "./jira.ts";
 import { NotesStore } from "./notesStore.ts";
 import { ReadingStore } from "./readingStore.ts";
@@ -73,6 +73,7 @@ async function main(): Promise<void> {
   };
 
   const notes = new NotesStore(config.notesDir);
+  const reading = new ReadingStore(config.notesDir);
   const cache = new ViewCache(config.notesDir);
   let broadcast: (e: LiveEvent) => void = () => {};
   const board = new BoardService({
@@ -82,6 +83,22 @@ async function main(): Promise<void> {
     notesDir: config.notesDir,
     statePath: path.join(config.notesDir, ".cache", "board-state.json"),
     onChange: (e) => broadcast(e),
+    reading: {
+      summary: async (id) => {
+        const item = await reading.read(id);
+        return item && { id: item.id, title: item.title, status: item.status, url: item.url, source: item.source };
+      },
+      // Kanban archive: reading items on the archived column become done (doneStatus in reading.yaml).
+      markDone: async (ids) => {
+        const { doneStatus } = await loadReadingConfig(config.notesDir);
+        for (const id of ids) {
+          const item = await reading.read(id);
+          if (!item || item.parseError || item.status === doneStatus) continue;
+          const r = await reading.setFields(id, { status: doneStatus });
+          if (r.ok) broadcast({ type: "reading", id });
+        }
+      },
+    },
   });
   const ticketFiles = createTicketFileSyncer(() =>
     syncTicketFiles({
@@ -103,7 +120,6 @@ async function main(): Promise<void> {
     onChange: (e) => broadcast(e),
     statePath: path.join(config.notesDir, ".cache", "reconcile.json"),
   });
-  const reading = new ReadingStore(config.notesDir);
   const app = createApp({ config, jira, notes, cache, refresher, board, reading, publicDir: path.join(root, "public") });
   broadcast = app.broadcast;
 

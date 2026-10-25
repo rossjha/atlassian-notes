@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { BoardCard, BoardOp, BoardResponse, LiveEvent, Ticket } from "../shared/types.ts";
+import type { BoardCard, BoardOp, BoardResponse, LiveEvent, ReadingSummary, Ticket } from "../shared/types.ts";
+import { readingIdFromCard } from "../shared/reading.ts";
 import { applyBoardOp, boardKeys, loadBoard, renameInBoard, updateBoard } from "./board.ts";
 import type { ViewCache } from "./cache.ts";
 import { ConfigFileError } from "./configFiles.ts";
@@ -21,7 +22,11 @@ export interface BoardServiceDeps {
   statePath: string;
   onChange: (e: LiveEvent) => void;
   now?: () => Date;
+  /** Reading list cards (reading:<id>): their summary for the board, and marking archived ones done. */
+  reading?: { summary(id: string): Promise<ReadingSummary | null>; markDone(ids: string[]): Promise<void> };
 }
+
+const isTicketCard = (key: string): boolean => readingIdFromCard(key) === null;
 
 interface State {
   notFound: Record<string, string>;
@@ -89,7 +94,7 @@ export class BoardService {
     const { jira, cache, notes, notesDir, onChange } = this.deps;
     let keys: string[];
     try {
-      keys = boardKeys(await loadBoard(notesDir));
+      keys = boardKeys(await loadBoard(notesDir)).filter(isTicketCard);
     } catch (e) {
       if (!(e instanceof ConfigFileError)) console.error("board refresh: cannot read board.yaml:", errMessage(e));
       return;
@@ -207,10 +212,23 @@ export class BoardService {
   }
 
   async apply(op: BoardOp): Promise<void> {
-    const { notesDir, onChange } = this.deps;
-    await updateBoard(notesDir, (b) => applyBoardOp(b, op));
+    const { notesDir, onChange, reading } = this.deps;
+    let archived: string[] = [];
+    await updateBoard(notesDir, (b) => {
+      if (op.op === "archive") {
+        archived = (b.cards[b.archiveColumn] ?? []).map(readingIdFromCard).filter((id): id is string => id !== null);
+      }
+      return applyBoardOp(b, op);
+    });
     onChange({ type: "board" });
-    if ((op.op === "add" || op.op === "move") && !(await this.knownKeys()).has(op.key)) {
+    if (archived.length && reading) {
+      try {
+        await reading.markDone(archived);
+      } catch (e) {
+        console.error("archive: marking reading items done failed:", errMessage(e));
+      }
+    }
+    if ((op.op === "add" || op.op === "move") && isTicketCard(op.key) && !(await this.knownKeys()).has(op.key)) {
       this.refresh().catch((e) => console.error("board refresh failed:", errMessage(e)));
     }
   }
@@ -237,6 +255,12 @@ export class BoardService {
     for (const col of board.columns) {
       cards[col] = [];
       for (const key of board.cards[col] ?? []) {
+        const readingId = readingIdFromCard(key);
+        if (readingId !== null) {
+          const summary = this.deps.reading ? await this.deps.reading.summary(readingId) : null;
+          cards[col].push({ key, row: null, missing: summary === null, reading: summary });
+          continue;
+        }
         const ticket = own.get(key) ?? fromViews.get(key);
         let row = null;
         if (ticket) {

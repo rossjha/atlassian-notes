@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BoardService, BOARD_CACHE_ID } from "../src/server/boardService.ts";
+import { BoardService, BOARD_CACHE_ID, type BoardServiceDeps } from "../src/server/boardService.ts";
 import { ViewCache } from "../src/server/cache.ts";
 import { NotesStore } from "../src/server/notesStore.ts";
 import { JiraError, type JiraClient } from "../src/server/jira.ts";
@@ -20,6 +20,7 @@ after(() => { for (const d of dirs) fs.rmSync(d, { recursive: true, force: true 
 function setup(
   keys: string[],
   jiraImpl: { search?: JiraClient["search"]; getIssueDetail?: JiraClient["getIssueDetail"] } = {},
+  extra: Partial<BoardServiceDeps> = {},
 ) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "board-"));
   dirs.push(dir);
@@ -48,6 +49,7 @@ function setup(
   const svc = new BoardService({
     jira, cache, notes, notesDir: dir, statePath: path.join(dir, ".cache", "board-state.json"),
     onChange: (e) => events.push(e), now: () => new Date("2026-10-24T10:00:00Z"),
+    ...extra,
   });
   return { dir, jira, searches, details, events, cache, notes, svc };
 }
@@ -254,4 +256,42 @@ test("overlapping refreshes coalesce into one follow-up run", async () => {
   release();
   await Promise.all([p1, p2, p3]);
   assert.equal(searches.length, 2);
+});
+
+const summary = (id: string) => ({ id, title: `T ${id}`, status: "Pending", url: `https://example.com/${id}`, source: "web" as const });
+
+test("refresh never searches Jira for reading cards", async () => {
+  const { svc, searches, details } = setup(["A-1", "reading:2026-10-25-a"], { search: async () => [t("A-1")] });
+  await svc.refresh();
+  assert.ok(searches.length > 0);
+  for (const q of searches) assert.ok(!q.includes("reading"), q);
+  assert.deepEqual(details, []);
+});
+
+test("archive marks reading items in the archive column done and clears the column", async () => {
+  const marked: string[][] = [];
+  const { dir, svc } = setup([], {}, { reading: { summary: async (id) => summary(id), markDone: async (ids) => { marked.push(ids); } } });
+  fs.writeFileSync(path.join(dir, "board.yaml"), "columns: [Backlog, Doing, PEN, Done]\narchiveColumn: Done\ncards:\n  Backlog: [reading:2026-10-25-b]\n  Doing: []\n  PEN: []\n  Done: [A-1, reading:2026-10-25-a]\n");
+  await svc.apply({ op: "archive" });
+  assert.deepEqual(marked, [["2026-10-25-a"]]);
+  const b = parseBoard(fs.readFileSync(path.join(dir, "board.yaml"), "utf8"), "board.yaml");
+  assert.deepEqual(b.cards.Done, []);
+  assert.deepEqual(b.cards.Backlog, ["reading:2026-10-25-b"]);
+});
+
+test("archive still succeeds when marking reading items done fails", async () => {
+  const { dir, svc } = setup([], {}, { reading: { summary: async (id) => summary(id), markDone: async () => { throw new Error("boom"); } } });
+  fs.writeFileSync(path.join(dir, "board.yaml"), "columns: [Backlog, Done]\narchiveColumn: Done\ncards:\n  Backlog: []\n  Done: [reading:2026-10-25-a]\n");
+  await svc.apply({ op: "archive" });
+  assert.deepEqual(parseBoard(fs.readFileSync(path.join(dir, "board.yaml"), "utf8"), "board.yaml").cards.Done, []);
+});
+
+test("view gives reading cards their summary, and a missing file shows missing: true", async () => {
+  const { svc } = setup(["reading:2026-10-25-a", "reading:2026-10-25-gone"], {}, {
+    reading: { summary: async (id) => (id === "2026-10-25-a" ? summary(id) : null), markDone: async () => {} },
+  });
+  const v = await svc.view([], []);
+  const [a, gone] = v.cards.Backlog;
+  assert.deepEqual(a, { key: "reading:2026-10-25-a", row: null, missing: false, reading: summary("2026-10-25-a") });
+  assert.deepEqual(gone, { key: "reading:2026-10-25-gone", row: null, missing: true, reading: null });
 });

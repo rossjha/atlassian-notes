@@ -3,6 +3,7 @@ import path from "node:path";
 import YAML from "yaml";
 import type { BoardFile, BoardOp } from "../shared/types.ts";
 import { ConfigFileError } from "./configFiles.ts";
+import { readingIdFromCard } from "../shared/reading.ts";
 import { isValidKey } from "./frontMatter.ts";
 import { atomicWrite } from "./notesStore.ts";
 
@@ -55,8 +56,10 @@ export function parseBoard(text: string, file: string): BoardFile {
     if (list === null || list === undefined) return;
     if (!Array.isArray(list)) throw new ConfigFileError(file, `cards for "${col}" must be a list`);
     for (const item of list) {
-      const key = String(item).trim().toUpperCase();
-      if (!isValidKey(key)) {
+      // Reading cards keep their lower-case id; ticket keys are upper-cased.
+      const raw = String(item).trim();
+      const key = readingIdFromCard(raw) !== null ? raw : raw.toUpperCase();
+      if (!isValidKey(key) && readingIdFromCard(key) === null) {
         console.warn(`${file}: ignoring invalid ticket key "${key}"`);
         continue;
       }
@@ -108,7 +111,7 @@ export function applyBoardOp(b: BoardFile, op: BoardOp): BoardFile {
     out.cards[out.archiveColumn] = [];
     return out;
   }
-  if (!isValidKey(op.key)) throw new BoardOpError(`invalid ticket key "${op.key}"`);
+  if (!isValidKey(op.key) && readingIdFromCard(op.key) === null) throw new BoardOpError(`invalid ticket key "${op.key}"`);
   switch (op.op) {
     case "add":
     {

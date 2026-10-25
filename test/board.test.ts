@@ -184,3 +184,25 @@ test("eventForPath maps reading items, reading groom files and reading.yaml", ()
   assert.equal(eventForPath("reading/items/Bad Id.md"), null);
   assert.equal(eventForPath(".cache/trash/reading/2026-10-25-a.1.md"), null);
 });
+
+test("parseBoard keeps reading:<id> entries as written and still upper-cases ticket keys", () => {
+  const b = parseBoard("columns: [Backlog, Done]\ncards:\n  Backlog: [a-1, reading:2026-10-25-a]\n  Done: []\n", "board.yaml");
+  assert.deepEqual(b.cards.Backlog, ["A-1", "reading:2026-10-25-a"]);
+});
+
+test("parseBoard drops reading:Bad Id with a warning", (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  const b = parseBoard("columns: [Backlog]\ncards:\n  Backlog: [\"reading:Bad Id\"]\n", "board.yaml");
+  assert.deepEqual(b.cards.Backlog, []);
+  assert.equal(warn.mock.callCount(), 1);
+});
+
+test("applyBoardOp add/move/remove work for reading:<id>", () => {
+  const b = sample();
+  const added = applyBoardOp(b, { op: "add", key: "reading:2026-10-25-a" });
+  assert.deepEqual(added.cards.Backlog, ["reading:2026-10-25-a"]);
+  const moved = applyBoardOp(added, { op: "move", key: "reading:2026-10-25-a", column: "Done", index: 0 });
+  assert.deepEqual(moved.cards.Done, ["reading:2026-10-25-a", "C-3"]);
+  assert.deepEqual(applyBoardOp(moved, { op: "remove", key: "reading:2026-10-25-a" }).cards.Done, ["C-3"]);
+  assert.throws(() => applyBoardOp(b, { op: "add", key: "reading:Bad Id" }), BoardOpError);
+});
