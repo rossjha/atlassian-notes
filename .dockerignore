@@ -1,0 +1,12 @@
+.git
+.superpowers
+node_modules
+dist
+public/js
+public/app.css
+public/vendor
+.env
+.env.*
+!.env.example
+*.zip
+.DS_Store

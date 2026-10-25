@@ -27,6 +27,7 @@ test("defaults, trailing slash, api base", () => {
   assert.equal(c.refreshMinutes, 15);
   assert.equal(c.port, 4317);
   assert.equal(c.openBrowser, true);
+  assert.equal(c.host, "127.0.0.1");
   assert.equal(c.jiraBaseUrl, "https://acme.atlassian.net");
   assert.equal(c.jiraApiBase, "https://acme.atlassian.net");
   assert.equal(c.defaultProject, "PAY");
@@ -39,6 +40,11 @@ test("NOTES_DIR tilde expansion and env overrides file", () => {
   assert.equal(c.notesDir, "/h/n");
   assert.equal(c.port, 5000);
   assert.equal(c.openBrowser, false);
+});
+
+test("HOST lets the server listen beyond loopback (inside a container)", () => {
+  assert.equal(loadConfig({ HOST: "0.0.0.0" }, "/h", () => required).host, "0.0.0.0");
+  assert.equal(loadConfig({}, "/h", () => `${required}\nHOST=::`).host, "::");
 });
 
 test("missing keys throw ConfigError", () => {

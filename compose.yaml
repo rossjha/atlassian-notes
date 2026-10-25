@@ -1,0 +1,26 @@
+# `docker compose up -d` runs the app in the background at http://localhost:4317 (this Mac only).
+# Your settings (~/.config/atlassian-notes) and notes (~/atlassian-notes-data) stay on the Mac and are mounted at
+# the same paths, with the same home folder, so every path the app shows or writes is the Mac's real path.
+#
+# Optional settings go in a .env file next to this one (not your Jira settings, those stay in ~/.config):
+#   NOTES_DIR=/Users/you/somewhere-else   # if your notes folder isn't ~/atlassian-notes-data
+#   PORT=4400                             # if 4317 is taken
+#   NODE_EXTRA_CA_CERTS=/Users/you/.config/atlassian-notes/corp-root.pem   # behind a TLS-inspecting proxy
+
+services:
+  app:
+    build: .
+    image: atlassian-notes
+    init: true
+    restart: unless-stopped
+    environment:
+      HOME: ${HOME}
+      PORT: ${PORT:-4317}
+      NOTES_DIR: ${NOTES_DIR:-${HOME}/atlassian-notes-data}
+      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-}
+    ports:
+      # Same port inside and out: the app only answers requests addressed to localhost:<its port>.
+      - "127.0.0.1:${PORT:-4317}:${PORT:-4317}"
+    volumes:
+      - ${HOME}/.config/atlassian-notes:${HOME}/.config/atlassian-notes
+      - ${NOTES_DIR:-${HOME}/atlassian-notes-data}:${NOTES_DIR:-${HOME}/atlassian-notes-data}

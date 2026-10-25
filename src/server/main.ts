@@ -132,7 +132,7 @@ async function main(): Promise<void> {
 
   await new Promise<void>((resolve, reject) => {
     app.server.once("error", reject);
-    app.server.listen(config.port, "127.0.0.1", resolve);
+    app.server.listen(config.port, config.host, resolve);
   });
   const url = `http://localhost:${config.port}/`;
   console.log(`atlassian-notes running at ${url}`);

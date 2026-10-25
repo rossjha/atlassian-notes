@@ -10,6 +10,8 @@ export interface Config {
   notesDir: string;
   refreshMinutes: number;
   port: number;
+  /** Address the server listens on: loopback unless set (the Docker image sets 0.0.0.0). */
+  host: string;
   openBrowser: boolean;
 }
 
@@ -33,6 +35,7 @@ const KEYS = [
   "NOTES_DIR",
   "REFRESH_MINUTES",
   "PORT",
+  "HOST",
   "OPEN_BROWSER",
 ];
 const REQUIRED = ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN", "JIRA_PROJECT"];
@@ -115,6 +118,7 @@ export function loadConfig(
     notesDir,
     refreshMinutes: positiveInt(v.REFRESH_MINUTES, 15),
     port: positiveInt(v.PORT, 4317),
+    host: v.HOST ?? "127.0.0.1",
     openBrowser: !["false", "0", "no"].includes((v.OPEN_BROWSER ?? "true").toLowerCase()),
   };
 }
