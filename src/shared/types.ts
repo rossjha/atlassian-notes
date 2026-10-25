@@ -134,12 +134,16 @@ export type LiveEvent =
   | { type: "note" | "groom"; key: string }
   | { type: "views" | "columns" | "links" }
   | { type: "orphans" }
+  | { type: "reading" | "readingGroom"; id: string }
+  | { type: "readingConfig" }
   | { type: "board" };
 
 export interface BoardCard {
   key: string;
   row: Row | null;
   missing: boolean;
+  /** Only on reading:<id> cards; null when the item's file is gone. */
+  reading?: ReadingSummary | null;
 }
 
 export interface BoardResponse {
@@ -150,4 +154,40 @@ export interface BoardResponse {
   fetchedAt: string | null;
   error: string | null;
   locked: boolean;
+}
+
+export type ReadingSource = "confluence" | "slack" | "video" | "web";
+
+export interface ReadingConfig {
+  statuses: string[];
+  doneStatus: string;
+  categories: string[];
+  prompts: string[];
+  groomPrompt: string;
+}
+
+export interface ReadingSummary {
+  id: string;
+  title: string;
+  status: string;
+  url: string;
+  source: ReadingSource;
+}
+
+export interface ReadingItem extends ReadingSummary {
+  category: string | null;
+  tickets: string[];
+  created: string;
+  /** The file's mtime, ISO: edits made in Obsidian count. */
+  updated: string;
+  mtimeMs: number;
+  note: string;
+  groom: { summary: string; groomedAt: string } | null;
+  parseError: string | null;
+}
+
+export interface ReadingListResponse {
+  items: ReadingItem[];
+  config: ReadingConfig;
+  error: string | null;
 }
