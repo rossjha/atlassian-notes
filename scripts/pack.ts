@@ -9,6 +9,7 @@ export const PACK_INCLUDE: string[] = [
   "package-lock.json",
   "tsconfig.json",
   "tsconfig.web.json",
+  "tsconfig.scratchpad.json",
   ".env.example",
   "README.md",
   "examples",

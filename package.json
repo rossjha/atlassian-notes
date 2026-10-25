@@ -7,16 +7,22 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.web.json && tailwindcss -i src/web/styles.css -o public/app.css --minify",
+    "build": "tsc -p tsconfig.web.json && tailwindcss -i src/web/styles.css -o public/app.css --minify && node scripts/build-scratchpad.ts",
     "start": "npm run build && node src/server/main.ts",
     "test": "node --test \"test/**/*.test.ts\"",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json --noEmit && tsc -p tsconfig.scratchpad.json",
     "setup": "node scripts/setup.ts",
     "pack": "node scripts/pack.ts"
   },
   "devDependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
     "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   },

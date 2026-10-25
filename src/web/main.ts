@@ -15,6 +15,7 @@ import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
 import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
 import { moveById } from "../shared/order.ts";
 import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
+import { flushScratchpad, showScratchpad } from "./scratchpad.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
@@ -25,6 +26,9 @@ applySavedTheme();
 const TAB_KEY = "atlassian-notes.activeTab";
 /** Special tab id; never a view id (view ids can't contain "_"). */
 const BOARD_TAB = "__board";
+const SCRATCH_TAB = "__scratch";
+/** Kanban and Scratchpad: tabs that aren't Jira views. */
+const isFixedTab = (id: string | null): boolean => id === BOARD_TAB || id === SCRATCH_TAB;
 
 let views: View[] = [];
 let columns: ColumnsConfig | null = null;
@@ -108,7 +112,10 @@ const filterEl = h("div", { class: "filter-bar" });
 const orphansEl = h("div", { class: "orphans-panel" });
 orphansEl.hidden = true;
 const tableEl = h("div", { class: "table-wrap" });
-root.append(h("main", { class: "app" }, tabsEl, headerEl, orphansEl, errorEl, filterEl, tableEl));
+// Kept (hidden) across tab switches: Excalidraw mounts once, so the canvas and its undo history survive.
+const scratchEl = h("div", { class: "scratch" });
+scratchEl.hidden = true;
+root.append(h("main", { class: "app" }, tabsEl, headerEl, orphansEl, errorEl, filterEl, tableEl, scratchEl));
 configureDrawer({
   getRow: (key) => rows.find((r) => r.ticket.key === key) ?? boardRow(key),
   onNoteSaved: () => void loadRows(),
@@ -356,17 +363,19 @@ async function commitJqlEdit(): Promise<void> {
   if (jqlEditor) el.focus();
 }
 
-/** Position along the tab bar: Kanban is 0, then the views in order; -1 if unknown. */
+/** Position along the tab bar: Kanban is 0, Scratchpad 1, then the views in order; -1 if unknown. */
 function tabIndex(id: string | null): number {
   if (id === BOARD_TAB) return 0;
+  if (id === SCRATCH_TAB) return 1;
   const i = views.findIndex((v) => v.id === id);
-  return i < 0 ? -1 : i + 1;
+  return i < 0 ? -1 : i + 2;
 }
 
 function selectTab(id: string): void {
   // Measured before views/activeId move on. Null (no slide) for a re-selected tab, the first selection, or a deleted tab.
   const dir = tabNavDir(tabIndex(activeId), tabIndex(id));
   if (jqlEditor && jqlEditor.viewId !== id) jqlEditor = null;
+  if (activeId === SCRATCH_TAB && id !== SCRATCH_TAB) void flushScratchpad();
   activeId = id;
   remember(id);
   // State changes above and below stay synchronous (callers such as saveEditedView read activeId straight after);
@@ -377,8 +386,13 @@ function selectTab(id: string): void {
   };
   if (id === BOARD_TAB) {
     rowsSeq++; // supersede any in-flight rows fetch
-    withPageTransition(dir, paint, [headerEl, filterEl, tableEl]);
+    withPageTransition(dir, paint, [headerEl, filterEl, tableEl, scratchEl]);
     void loadBoard();
+    return;
+  }
+  if (id === SCRATCH_TAB) {
+    rowsSeq++;
+    withPageTransition(dir, paint, [headerEl, filterEl, tableEl, scratchEl]);
     return;
   }
   sort = null;
@@ -388,7 +402,7 @@ function selectTab(id: string): void {
   fetchedAt = cached?.fetchedAt ?? null;
   rowsError = cached?.error ?? null;
   rowsLoaded = cached !== undefined;
-  withPageTransition(dir, paint, [headerEl, filterEl, tableEl]);
+  withPageTransition(dir, paint, [headerEl, filterEl, tableEl, scratchEl]);
   void loadRows();
 }
 
@@ -427,6 +441,7 @@ function renderTabs(): void {
   const focusedId = (document.activeElement?.closest(".tab-wrap") as HTMLElement | null)?.dataset.viewId ?? null;
   const locked = viewsLocked();
   const onBoard = activeId === BOARD_TAB;
+  const onScratch = activeId === SCRATCH_TAB;
   const viewTabs = views.map((v) =>
     h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}`, "data-view-id": v.id },
       h("button", {
@@ -440,6 +455,9 @@ function renderTabs(): void {
   tabsListEl.replaceChildren(
     h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onBoard ? " active" : ""}`, title: "Kanban", "aria-label": "Kanban", onclick: () => selectTab(BOARD_TAB) }, icon("viewColumns", "tab-svg")),
+    ),
+    h("span", { class: `tab-wrap${onScratch ? " active" : ""}` },
+      h("button", { type: "button", class: `tab tab-kanban${onScratch ? " active" : ""}`, title: "Scratchpad", "aria-label": "Scratchpad", onclick: () => selectTab(SCRATCH_TAB) }, icon("paintBrush", "tab-svg")),
     ),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...viewTabs,
@@ -476,6 +494,7 @@ function renderChrome(): void {
   const locked = viewsLocked();
   const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
   const onBoard = activeId === BOARD_TAB;
+  const onScratch = activeId === SCRATCH_TAB;
   renderTabs();
   const view = activeView();
   headerEl.replaceChildren();
@@ -513,13 +532,13 @@ function renderChrome(): void {
       },
     }, `${orphans.length} orphaned ${orphans.length === 1 ? "note" : "notes"}`));
   }
-  headerEl.hidden = onBoard && orphans.length === 0; // the board draws its own header
+  headerEl.hidden = (onBoard || onScratch) && orphans.length === 0; // the board draws its own header; the scratchpad has none
   orphansEl.hidden = !(orphansOpen && orphans.length > 0);
   orphansEl.replaceChildren(
     h("div", { class: "text-muted" }, "Notes whose ticket is no longer found in Jira. The files are left untouched."),
     ...orphans.map((o) => h("div", { class: "orphan-row" }, h("code", { class: "key" }, o.key), h("code", { class: "text-muted" }, o.notePath), h("code", { class: "text-muted" }, o.groomPath))),
   );
-  const err = (onBoard ? [boardData?.error, boardError, opError ? saveError : null] : [configError ?? rowsError, saveError]).filter(Boolean).join("\n");
+  const err = (onBoard ? [boardData?.error, boardError, opError ? saveError : null] : onScratch ? [] : [configError ?? rowsError, saveError]).filter(Boolean).join("\n");
   errorEl.textContent = err;
   errorEl.hidden = !err;
 }
@@ -660,6 +679,15 @@ function renderBody(): void {
     return;
   }
   renderDeferred = false;
+  const onScratch = activeId === SCRATCH_TAB;
+  scratchEl.hidden = !onScratch;
+  tableEl.hidden = onScratch;
+  if (onScratch) {
+    filterEl.replaceChildren();
+    filterEl.hidden = true;
+    void showScratchpad(scratchEl);
+    return;
+  }
   if (activeId === BOARD_TAB) {
     filterEl.replaceChildren();
     filterEl.hidden = true;
@@ -701,19 +729,19 @@ async function loadConfig(): Promise<void> {
   } catch (e) {
     configError = (e as Error).message;
   }
-  if (activeId !== BOARD_TAB && !views.some((v) => v.id === activeId)) {
+  if (!isFixedTab(activeId) && !views.some((v) => v.id === activeId)) {
     const saved = remembered();
-    activeId = saved === BOARD_TAB ? BOARD_TAB : views.find((v) => v.id === saved)?.id ?? views[0]?.id ?? null;
+    activeId = isFixedTab(saved) ? saved : views.find((v) => v.id === saved)?.id ?? views[0]?.id ?? null;
   }
   renderChrome();
   renderBody();
   if (activeId === BOARD_TAB) await loadBoard();
-  else await loadRows();
+  else if (activeId !== SCRATCH_TAB) await loadRows();
 }
 
 async function loadRows(): Promise<void> {
   const id = activeId;
-  if (!id || id === BOARD_TAB) return;
+  if (!id || isFixedTab(id)) return;
   const seq = ++rowsSeq;
   try {
     const r = await api.rows(id);
@@ -738,7 +766,7 @@ async function loadOrphans(): Promise<void> {
 }
 
 function applyRows(r: Row[], at: string | null, err: string | null): void {
-  if (activeId && activeId !== BOARD_TAB) rowsCache.set(activeId, { rows: r, fetchedAt: at, error: err });
+  if (activeId && !isFixedTab(activeId)) rowsCache.set(activeId, { rows: r, fetchedAt: at, error: err });
   rows = r;
   rowsLoaded = true;
   fetchedAt = at;
@@ -749,7 +777,7 @@ function applyRows(r: Row[], at: string | null, err: string | null): void {
 
 async function doRefresh(): Promise<void> {
   const id = activeId;
-  if (!id || id === BOARD_TAB || refreshingIds.has(id)) return;
+  if (!id || isFixedTab(id) || refreshingIds.has(id)) return;
   refreshingIds.add(id);
   renderChrome();
   try {

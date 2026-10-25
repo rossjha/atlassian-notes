@@ -202,6 +202,12 @@ body {
   .tab-draggable, .tab-draggable .tab { touch-action: pan-y; }
   .tab-wrap.tab-moving { opacity: 0.55; }
   html.tabs-dragging, html.tabs-dragging * { cursor: grabbing !important; user-select: none; }
+  /* Scratchpad tab: Excalidraw fills the rest of the window under the tab bar. */
+  .scratch { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+  .scratch[hidden] { display: none; }
+  .scratch-bar { display: flex; justify-content: space-between; gap: 1rem; font-size: 12px; }
+  .scratch-status-error { color: var(--danger); }
+  .scratch-canvas { height: calc(100dvh - 6.5rem); min-height: 20rem; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
   .col-drop-marker { position: fixed; width: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; z-index: 50; }
   .display-toggle { flex: none; padding: 0 0.4rem; color: var(--muted); cursor: pointer; background: none; font-size: 12px; }
   .display-toggle:hover { color: var(--accent); }

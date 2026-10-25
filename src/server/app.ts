@@ -11,7 +11,7 @@ import { bothMarkdown, groomPrompt, ticketMarkdown } from "./copyText.ts";
 import { InvalidKeyError, isValidKey } from "./frontMatter.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
 import { renderMarkdownSafe } from "./markdown.ts";
-import type { NotesStore, WriteResult } from "./notesStore.ts";
+import { atomicWrite, type NotesStore, type WriteResult } from "./notesStore.ts";
 import { buildRow } from "./rows.ts";
 import type { Refresher } from "./refresher.ts";
 
@@ -27,6 +27,9 @@ export interface AppDeps {
 
 const CSP = "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const MAX_BODY = 1024 * 1024;
+/** Scratchpad scenes embed pasted images as data URLs, so they get a larger limit. */
+const MAX_SCRATCHPAD_BODY = 50 * 1024 * 1024;
+const SCRATCHPAD_FILE = "scratchpad.excalidraw";
 const PING_MS = 25_000;
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -77,12 +80,12 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" }).end(text);
   }
 
-  async function readJson(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  async function readJson(req: http.IncomingMessage, maxBytes = MAX_BODY): Promise<Record<string, unknown>> {
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of req) {
       size += (chunk as Buffer).length;
-      if (size > MAX_BODY) throw new HttpError(413, "Request body too large");
+      if (size > maxBytes) throw new HttpError(413, "Request body too large");
       chunks.push(chunk as Buffer);
     }
     const text = Buffer.concat(chunks).toString("utf8");
@@ -130,6 +133,23 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     } catch {
       return undefined;
     }
+  }
+
+  async function readScratchpad(): Promise<{ scene: Record<string, unknown> | null; error: string | null }> {
+    let text: string;
+    try {
+      text = await fs.readFile(path.join(config.notesDir, SCRATCHPAD_FILE), "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return { scene: null, error: null };
+      throw e;
+    }
+    try {
+      const scene: unknown = JSON.parse(text);
+      if (typeof scene === "object" && scene !== null && !Array.isArray(scene)) return { scene: scene as Record<string, unknown>, error: null };
+    } catch {
+      // reported below
+    }
+    return { scene: null, error: `${SCRATCHPAD_FILE} is not valid Excalidraw JSON; fix or remove it` };
   }
 
   function sendWrite(res: http.ServerResponse, r: WriteResult): void {
@@ -307,6 +327,17 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       const body = await readJson(req);
       if (body.value !== null && typeof body.value !== "string") throw new HttpError(400, "value must be a string or null");
       return sendWrite(res, await notes.setNoteField(b, d, body.value, await jiraIdFor(b)));
+    }
+    if (a === "scratchpad" && segs.length === 1 && method === "GET") {
+      return send(res, 200, await readScratchpad());
+    }
+    if (a === "scratchpad" && segs.length === 1 && method === "PUT") {
+      const body = await readJson(req, MAX_SCRATCHPAD_BODY);
+      if (body.type !== "excalidraw" || !Array.isArray(body.elements)) throw new HttpError(400, "Not an Excalidraw scene");
+      // Never overwrite a file we couldn't read: it may be a hand edit (or another tool's) mid-way.
+      if ((await readScratchpad()).error) return send(res, 409, { error: `${SCRATCHPAD_FILE} could not be read; fix or remove it first` });
+      await atomicWrite(path.join(config.notesDir, SCRATCHPAD_FILE), JSON.stringify(body, null, 2));
+      return send(res, 200, {});
     }
     if (a === "board" && segs.length === 1 && method === "GET") {
       return send(res, 200, await boardView());

@@ -5,3 +5,4 @@ dist/
 .superpowers/
 public/js/
 public/app.css
+public/vendor/

@@ -486,3 +486,31 @@ test("ticket detail for a moved key reads note and groom under the canonical key
   assert.equal(body.note.body.trim(), "canonical note");
   assert.match(body.groomPath, /NEW-5/);
 });
+
+test("scratchpad: empty until saved, round-trips, rejects non-scenes, allows big drawings", async () => {
+  const file = path.join(dir, "scratchpad.excalidraw");
+  const get = async () => (await fetch(base() + "/api/scratchpad")).json() as Promise<{ scene: unknown; error: string | null }>;
+  assert.deepEqual(await get(), { scene: null, error: null });
+  const scene = { type: "excalidraw", version: 2, source: "x", elements: [{ id: "a" }], appState: {}, files: {} };
+  assert.equal((await put("/api/scratchpad", scene)).status, 200);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), scene);
+  assert.deepEqual(await get(), { scene, error: null });
+  assert.equal((await put("/api/scratchpad", { type: "other", elements: [] })).status, 400);
+  assert.equal((await put("/api/scratchpad", { type: "excalidraw", elements: "no" })).status, 400);
+  // Embedded images make scenes larger than the 1 MB limit for other bodies.
+  const big = { ...scene, files: { f: { dataURL: "x".repeat(3_000_000) } } };
+  assert.equal((await put("/api/scratchpad", big)).status, 200);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), big);
+});
+
+test("scratchpad: a corrupt file is reported, never overwritten", async () => {
+  const file = path.join(dir, "scratchpad.excalidraw");
+  fs.writeFileSync(file, "{broken");
+  const r = (await (await fetch(base() + "/api/scratchpad")).json()) as { scene: unknown; error: string | null };
+  assert.equal(r.scene, null);
+  assert.match(r.error ?? "", /scratchpad\.excalidraw/);
+  const scene = { type: "excalidraw", version: 2, elements: [], appState: {}, files: {} };
+  assert.equal((await put("/api/scratchpad", scene)).status, 409);
+  assert.equal(fs.readFileSync(file, "utf8"), "{broken");
+  fs.rmSync(file);
+});

@@ -34,6 +34,7 @@ columns.yaml          custom columns + Jira field mapping
 jira/notes/KEY.md     your notes
 jira/groom/KEY.md     groom output written by Claude (the app only reads it)
 jira/tickets/KEY.md   generated ticket files for Obsidian (generated; edits are overwritten)
+scratchpad.excalidraw the Scratchpad tab's drawing
 .cache/               last Jira results, so the app opens instantly
 ```
 
@@ -122,6 +123,10 @@ The table shows `readiness`, `summary` and age. Without front matter, the first 
 To wire up your own Claude skill (for example `groom-work-item`), add this line to it:
 
 > Save your output to `$NOTES_DIR/jira/groom/<KEY>.md` (default `~/atlassian-notes-data`) with front matter `readiness`, `summary` and `groomed_at` (ISO timestamp), followed by the full write-up.
+
+## Scratchpad
+
+The brush tab next to Kanban is a single [Excalidraw](https://excalidraw.com) canvas for sketching while you refine. It saves itself to `scratchpad.excalidraw` in your notes folder a moment after each change (Excalidraw's own file format, so Obsidian's Excalidraw plugin can open it too). Excalidraw and its fonts are bundled into the app at build time (`npm start` builds them into `public/vendor/`), so nothing is fetched from the internet; sharing links, AI features and the online library browser are off or unreachable. Chinese, Japanese and Korean text uses a fallback font. Close Obsidian while drawing if it has the notes folder open, and reopen it when you're done.
 
 ## Themes
 
