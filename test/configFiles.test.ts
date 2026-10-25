@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ConfigFileError, ensureDataDir, loadColumns, loadViews, saveViews } from "../src/server/configFiles.ts";
+import { ConfigFileError, DEFAULT_READING_CONFIG, ensureDataDir, loadColumns, loadReadingConfig, loadViews, saveViews } from "../src/server/configFiles.ts";
 
 const examples = fileURLToPath(new URL("../examples/", import.meta.url));
 let dir: string;
@@ -174,4 +174,43 @@ test("invalid column widths are dropped with a warning, keeping the column", asy
     { id: "groom" },
   ]);
   assert.equal(warn.mock.callCount(), 5);
+});
+
+test("ensureDataDir creates reading.yaml from the example and the reading folders", async () => {
+  await ensureDataDir(dir, "PAY", examples);
+  for (const d of ["reading/items", "reading/groom"]) assert.ok((await fs.stat(path.join(dir, d))).isDirectory());
+  const cfg = await loadReadingConfig(dir);
+  assert.deepEqual(cfg.statuses, ["Pending", "Open questions", "Complete"]);
+  assert.equal(cfg.doneStatus, "Complete");
+  assert.deepEqual(cfg.categories, ["Architecture", "RFC", "Discussion", "Learning"]);
+  assert.equal(cfg.prompts.length, 5);
+  assert.ok(cfg.groomPrompt.includes("{groomPath}"));
+});
+
+test("loadReadingConfig: missing file gives the defaults", async () => {
+  const cfg = await loadReadingConfig(dir);
+  assert.deepEqual(cfg, DEFAULT_READING_CONFIG);
+  assert.deepEqual(cfg.statuses, ["Pending", "Open questions", "Complete"]);
+  assert.equal(cfg.doneStatus, "Complete");
+});
+
+test("loadReadingConfig: doneStatus must be one of statuses", async () => {
+  await fs.writeFile(path.join(dir, "reading.yaml"), "statuses: [Pending, Done]\ndoneStatus: Complete\n");
+  await assert.rejects(loadReadingConfig(dir), (e: unknown) => e instanceof ConfigFileError && /doneStatus/.test((e as Error).message));
+});
+
+test("loadReadingConfig: statuses must be a non-empty list of unique non-empty strings", async () => {
+  for (const bad of ["statuses: []\n", "statuses: [A, A]\n", "statuses: [A, '']\n", "statuses: nope\n"]) {
+    await fs.writeFile(path.join(dir, "reading.yaml"), bad);
+    await assert.rejects(loadReadingConfig(dir), (e: unknown) => e instanceof ConfigFileError && /statuses/.test((e as Error).message), bad);
+  }
+});
+
+test("loadReadingConfig: doneStatus defaults to the last status; categories and prompts default to []; groomPrompt to the default", async () => {
+  await fs.writeFile(path.join(dir, "reading.yaml"), "statuses: [Todo, Done]\n");
+  const cfg = await loadReadingConfig(dir);
+  assert.equal(cfg.doneStatus, "Done");
+  assert.deepEqual(cfg.categories, []);
+  assert.deepEqual(cfg.prompts, []);
+  assert.equal(cfg.groomPrompt, DEFAULT_READING_CONFIG.groomPrompt);
 });

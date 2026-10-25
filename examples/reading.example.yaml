@@ -1,0 +1,10 @@
+statuses: [Pending, Open questions, Complete]   # first = default for new items; each is a sub-tab
+doneStatus: Complete                            # used by Kanban archive
+categories: [Architecture, RFC, Discussion, Learning]
+prompts:                                        # shown above the note editor
+  - Why am I reading this?
+  - What is it saying, in my own words?
+  - How does it connect to the work, and to what I already know?
+  - What do I question or disagree with?
+  - What will I do next?
+groomPrompt: "Read {url} ({title}). Write a reading summary to {groomPath} with front matter summary and groomed_at (ISO): key ideas, how it relates to {tickets}, open questions. My notes so far are in {notePath}."

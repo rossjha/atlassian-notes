@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
 import { BUILTIN_COLUMNS } from "../shared/types.ts";
-import type { ColumnSetting, ColumnsConfig, CustomColumnDef, FilterValue, Filters, View } from "../shared/types.ts";
+import type { ColumnSetting, ColumnsConfig, CustomColumnDef, FilterValue, Filters, ReadingConfig, View } from "../shared/types.ts";
 import { parseLinks, type NavLink } from "../shared/links.ts";
 import { atomicWrite } from "./notesStore.ts";
 
@@ -43,10 +43,10 @@ async function exists(file: string): Promise<boolean> {
 }
 
 export async function ensureDataDir(notesDir: string, projectKey: string, examplesDir: string): Promise<void> {
-  for (const d of ["jira/notes", "jira/groom", ".cache/views"]) {
+  for (const d of ["jira/notes", "jira/groom", ".cache/views", "reading/items", "reading/groom"]) {
     await fs.mkdir(path.join(notesDir, d), { recursive: true });
   }
-  for (const name of ["views", "columns", "board"]) {
+  for (const name of ["views", "columns", "board", "reading"]) {
     const target = path.join(notesDir, `${name}.yaml`);
     if (await exists(target)) continue;
     const template = await fs.readFile(path.join(examplesDir, `${name}.example.yaml`), "utf8");
@@ -218,4 +218,48 @@ export function validateViews(
 
 export async function saveViews(notesDir: string, views: View[]): Promise<void> {
   await atomicWrite(path.join(notesDir, "views.yaml"), YAML.stringify({ views }));
+}
+
+/** Used when reading.yaml is missing (it matches examples/reading.example.yaml) and when it is broken. */
+export const DEFAULT_READING_CONFIG: ReadingConfig = {
+  statuses: ["Pending", "Open questions", "Complete"],
+  doneStatus: "Complete",
+  categories: ["Architecture", "RFC", "Discussion", "Learning"],
+  prompts: [
+    "Why am I reading this?",
+    "What is it saying, in my own words?",
+    "How does it connect to the work, and to what I already know?",
+    "What do I question or disagree with?",
+    "What will I do next?",
+  ],
+  groomPrompt:
+    "Read {url} ({title}). Write a reading summary to {groomPath} with front matter summary and groomed_at (ISO): key ideas, how it relates to {tickets}, open questions. My notes so far are in {notePath}.",
+};
+
+function stringList(file: string, v: unknown, name: string, nonEmpty: boolean): string[] {
+  if (!Array.isArray(v) || !v.every((x) => typeof x === "string" && x.trim() !== "")) {
+    throw new ConfigFileError(file, `${name} must be a list of non-empty strings`);
+  }
+  const list = (v as string[]).map((x) => x.trim());
+  if (nonEmpty && list.length === 0) throw new ConfigFileError(file, `${name} must not be empty`);
+  if (new Set(list).size !== list.length) throw new ConfigFileError(file, `${name} has duplicates`);
+  return list;
+}
+
+/** reading.yaml: statuses (first = default, each a sub-tab), doneStatus, categories, prompts, groomPrompt. */
+export async function loadReadingConfig(notesDir: string): Promise<ReadingConfig> {
+  const file = path.join(notesDir, "reading.yaml");
+  const raw = await readYaml(file);
+  if (raw === null || raw === undefined) return { ...DEFAULT_READING_CONFIG };
+  if (!isObj(raw)) throw new ConfigFileError(file, "top level must be a mapping");
+  const statuses = raw.statuses === undefined ? DEFAULT_READING_CONFIG.statuses : stringList(file, raw.statuses, "statuses", true);
+  const doneStatus = strOrNull(file, raw.doneStatus, "doneStatus") ?? statuses[statuses.length - 1];
+  if (!statuses.includes(doneStatus)) throw new ConfigFileError(file, `doneStatus "${doneStatus}" is not one of the statuses`);
+  return {
+    statuses,
+    doneStatus,
+    categories: raw.categories === undefined || raw.categories === null ? [] : stringList(file, raw.categories, "categories", false),
+    prompts: raw.prompts === undefined || raw.prompts === null ? [] : stringList(file, raw.prompts, "prompts", false),
+    groomPrompt: strOrNull(file, raw.groomPrompt, "groomPrompt") ?? DEFAULT_READING_CONFIG.groomPrompt,
+  };
 }
