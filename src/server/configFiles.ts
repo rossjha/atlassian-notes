@@ -3,6 +3,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { BUILTIN_COLUMNS } from "../shared/types.ts";
 import type { ColumnSetting, ColumnsConfig, CustomColumnDef, FilterValue, Filters, View } from "../shared/types.ts";
+import { parseLinks, type NavLink } from "../shared/links.ts";
 import { atomicWrite } from "./notesStore.ts";
 
 export class ConfigFileError extends Error {
@@ -72,6 +73,22 @@ function strOrNull(file: string, v: unknown, name: string): string | null | unde
   if (v === undefined || v === null) return undefined;
   if (typeof v !== "string") throw new ConfigFileError(file, `${name} must be a string`);
   return v;
+}
+
+/**
+ * links.yaml (optional): custom top-bar links. Never throws for the file's content: a broken file or bad entries
+ * become `error` (shown as a warning) while views and columns keep working.
+ */
+export async function loadLinks(notesDir: string): Promise<{ links: NavLink[]; error: string | null }> {
+  let raw: unknown;
+  try {
+    raw = await readYaml(path.join(notesDir, "links.yaml"));
+  } catch (e) {
+    if (e instanceof ConfigFileError) return { links: [], error: e.message };
+    throw e;
+  }
+  const { links, warnings } = parseLinks(raw);
+  return { links, error: warnings.length ? warnings.map((w) => `links.yaml: ${w}`).join("\n") : null };
 }
 
 export async function loadColumns(notesDir: string): Promise<ColumnsConfig> {

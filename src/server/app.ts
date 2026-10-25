@@ -6,7 +6,7 @@ import type { ViewCache } from "./cache.ts";
 import type { Config } from "./config.ts";
 import { BoardOpError } from "./board.ts";
 import { BOARD_CACHE_ID, type BoardService } from "./boardService.ts";
-import { ConfigFileError, loadColumns, loadViews, saveViews, validateViews } from "./configFiles.ts";
+import { ConfigFileError, loadColumns, loadLinks, loadViews, saveViews, validateViews } from "./configFiles.ts";
 import { bothMarkdown, groomPrompt, ticketMarkdown } from "./copyText.ts";
 import { InvalidKeyError, isValidKey } from "./frontMatter.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
@@ -219,7 +219,8 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
         if (!(err instanceof ConfigFileError)) throw err;
         error = err.message;
       }
-      return send(res, 200, { views, columns, jiraBaseUrl: config.jiraBaseUrl, error });
+      const { links, error: linksError } = await loadLinks(config.notesDir);
+      return send(res, 200, { views, columns, jiraBaseUrl: config.jiraBaseUrl, error, links, linksError });
     }
     if (method === "PUT" && a === "views" && segs.length === 1) {
       const body = await readJson(req);

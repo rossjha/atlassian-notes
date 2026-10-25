@@ -165,6 +165,7 @@ test("broken board.yaml rejects and is left byte-identical; queue is not wedged"
 
 test("eventForPath maps board.yaml", () => {
   assert.deepEqual(eventForPath("board.yaml"), { type: "board" });
+  assert.deepEqual(eventForPath("links.yaml"), { type: "links" });
 });
 
 test("parseBoard upper-cases and trims hand-typed keys (deduping after normalising)", () => {

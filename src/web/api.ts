@@ -1,3 +1,4 @@
+import type { NavLink } from "../shared/links.ts";
 import type { BoardOp, BoardResponse, ColumnsConfig, GroomFile, IssueDetail, NoteFile, Row, View } from "../shared/types.ts";
 
 export interface ConfigResponse {
@@ -5,6 +6,9 @@ export interface ConfigResponse {
   columns: ColumnsConfig;
   jiraBaseUrl: string;
   error: string | null;
+  links: NavLink[];
+  /** links.yaml problems (bad entries are skipped; the rest still show). */
+  linksError: string | null;
 }
 
 export interface RowsResponse {

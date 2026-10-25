@@ -103,6 +103,23 @@ test("GET /api/config returns the 3 example views, columns and jira url", async 
   assert.equal(body.jiraBaseUrl, "https://acme.example");
   assert.ok(body.columns.custom.category);
   assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.deepEqual(body.links, []); // no links.yaml yet
+  assert.equal(body.linksError, null);
+});
+
+test("GET /api/config carries links.yaml links, warnings for bad entries, and survives broken YAML", async () => {
+  const file = path.join(dir, "links.yaml");
+  fs.writeFileSync(file, "links:\n  - { name: Roadmap, url: https://roadmap.example.com, icon: map }\n  - { name: Bad, url: ftp://x.example.com }\n");
+  let body = await (await fetch(base() + "/api/config")).json();
+  assert.deepEqual(body.links, [{ name: "Roadmap", url: "https://roadmap.example.com/", icon: { kind: "named", name: "map" }, newTab: true }]);
+  assert.match(body.linksError, /^links\.yaml: "Bad" url/);
+  assert.equal(body.error, null); // views and columns are unaffected
+  fs.writeFileSync(file, "links: [ {");
+  body = await (await fetch(base() + "/api/config")).json();
+  assert.deepEqual(body.links, []);
+  assert.match(body.linksError, /links\.yaml: invalid YAML/);
+  assert.equal(body.views.length, 3);
+  fs.rmSync(file);
 });
 
 test("refresh then rows returns the fake tickets; unknown view is 404", async () => {

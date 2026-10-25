@@ -132,7 +132,7 @@ export type BoardOp =
 export type LiveEvent =
   | { type: "rows"; viewId: string }
   | { type: "note" | "groom"; key: string }
-  | { type: "views" | "columns" }
+  | { type: "views" | "columns" | "links" }
   | { type: "orphans" }
   | { type: "board" };
 

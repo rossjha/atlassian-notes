@@ -10,6 +10,7 @@ export function eventForPath(rel: string): LiveEvent | null {
   if (p === "views.yaml") return { type: "views" };
   if (p === "columns.yaml") return { type: "columns" };
   if (p === "board.yaml") return { type: "board" };
+  if (p === "links.yaml") return { type: "links" };
   const m = /^jira\/(notes|groom)\/(.+)\.md$/.exec(p);
   if (m && isValidKey(m[2])) return { type: m[1] === "notes" ? "note" : "groom", key: m[2] };
   return null;

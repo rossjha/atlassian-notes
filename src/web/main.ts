@@ -1,5 +1,5 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
-import { icon, refreshButton } from "./icons.ts";
+import { icon, linkIcon, refreshButton } from "./icons.ts";
 import { confirmDialog, themePickerButton, viewSettingsButton } from "./viewMenu.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
@@ -15,6 +15,7 @@ import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
 import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
 import { moveById } from "../shared/order.ts";
 import { jiraSearchUrl } from "../shared/jiraUrls.ts";
+import type { NavLink } from "../shared/links.ts";
 import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
 import { flushScratchpad, showScratchpad } from "./scratchpad.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
@@ -34,6 +35,8 @@ const isFixedTab = (id: string | null): boolean => id === BOARD_TAB || id === SC
 let views: View[] = [];
 let columns: ColumnsConfig | null = null;
 let jiraBaseUrl: string | null = null;
+let navLinks: NavLink[] = [];
+let linksError: string | null = null;
 let configError: string | null = null;
 let activeId: string | null = null;
 let rows: Row[] = [];
@@ -461,6 +464,7 @@ function renderTabs(): void {
     h("span", { class: `tab-wrap${onScratch ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onScratch ? " active" : ""}`, title: "Scratchpad", "aria-label": "Scratchpad", onclick: () => selectTab(SCRATCH_TAB) }, icon("paintBrush", "tab-svg")),
     ),
+    ...navLinks.map(navLinkTab),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...viewTabs,
   );
@@ -472,6 +476,24 @@ function renderTabs(): void {
   }
   if (focusedId !== null) viewTabs[views.findIndex((v) => v.id === focusedId)]?.querySelector<HTMLElement>(".tab")?.focus();
   placeTabIndicator();
+}
+
+/** A links.yaml link, beside Kanban and Scratchpad: its icon, or its name when it has none. */
+function navLinkTab(l: NavLink): HTMLElement {
+  const label = l.newTab ? `${l.name} (opens in a new tab)` : l.name;
+  const body = l.icon === null
+    ? l.name
+    : l.icon.kind === "named"
+      ? linkIcon(l.icon.name, "tab-svg")
+      : h("span", { class: "tab-emoji", "aria-hidden": "true" }, l.icon.text);
+  const a = h("a", { class: `tab tab-kanban tab-link${l.icon === null ? " tab-link-text" : ""}`, href: l.url, title: label, "aria-label": label }, body);
+  if (l.newTab) {
+    a.setAttribute("target", "_blank");
+    a.setAttribute("rel", "noopener noreferrer");
+  } else {
+    a.addEventListener("click", () => void flushScratchpad()); // leaving the page: save the drawing first
+  }
+  return h("span", { class: "tab-wrap" }, a);
 }
 
 /** Optimistically moves a view tab and saves the new order to views.yaml. */
@@ -553,7 +575,7 @@ function renderChrome(): void {
     h("div", { class: "text-muted" }, "Notes whose ticket is no longer found in Jira. The files are left untouched."),
     ...orphans.map((o) => h("div", { class: "orphan-row" }, h("code", { class: "key" }, o.key), h("code", { class: "text-muted" }, o.notePath), h("code", { class: "text-muted" }, o.groomPath))),
   );
-  const err = (onBoard ? [boardData?.error, boardError, opError ? saveError : null] : onScratch ? [] : [configError ?? rowsError, saveError]).filter(Boolean).join("\n");
+  const err = [...(onBoard ? [boardData?.error, boardError, opError ? saveError : null] : onScratch ? [] : [configError ?? rowsError, saveError]), linksError].filter(Boolean).join("\n");
   errorEl.textContent = err;
   errorEl.hidden = !err;
 }
@@ -741,6 +763,8 @@ async function loadConfig(): Promise<void> {
     if (pendingViewSaves === 0) views = cfg.views; // else a queued save holds newer views; its own live event reloads
     columns = cfg.columns;
     jiraBaseUrl = cfg.jiraBaseUrl;
+    navLinks = cfg.links ?? [];
+    linksError = cfg.linksError ?? null;
     configError = cfg.error;
   } catch (e) {
     configError = (e as Error).message;
@@ -823,6 +847,7 @@ function onLive(e: LiveEvent): void {
       break;
     case "views":
     case "columns":
+    case "links":
       void loadConfig();
       break;
     case "board":

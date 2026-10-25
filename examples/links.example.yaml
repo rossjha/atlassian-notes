@@ -1,0 +1,19 @@
+# Optional: copy to links.yaml in your notes folder to add links to the top bar, next to Kanban and Scratchpad.
+# Changes show up straight away. Only https:// and http:// urls are allowed.
+#
+#   name:    shown as the tooltip (and as the button text when there's no icon)
+#   url:     the page to open
+#   icon:    optional; one of link, globe, map, book, bookmark, calendar, chart, presentation, chat,
+#            clipboard, cube, document, flag, lightbulb, rocket, grid, star, team — or an emoji
+#   newTab:  optional; true (the default) opens a new browser tab, false opens it in this one
+links:
+  - name: Roadmap
+    url: https://roadmap.example.com/
+    icon: map
+  - name: Team wiki
+    url: https://wiki.example.com/team
+    icon: book
+    newTab: false
+  - name: Dashboards
+    url: https://dashboards.example.com/
+    icon: 📊
