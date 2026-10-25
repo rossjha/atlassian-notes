@@ -13,6 +13,8 @@ import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
 import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
+import { moveById } from "../shared/order.ts";
+import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
@@ -412,23 +414,69 @@ window.addEventListener("resize", () => {
   placeTabIndicator();
 });
 
-function renderChrome(): void {
+/** Set while a tab drag holds back a tab bar rebuild; the drag's end applies it. */
+let tabsPending = false;
+
+function renderTabs(): void {
+  if (isTabDragging()) {
+    tabsPending = true;
+    return;
+  }
+  tabsPending = false;
+  // A rebuild keeps focus on the same view tab (so Alt+Shift+←/→ can be pressed repeatedly).
+  const focusedId = (document.activeElement?.closest(".tab-wrap") as HTMLElement | null)?.dataset.viewId ?? null;
   const locked = viewsLocked();
-  const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
   const onBoard = activeId === BOARD_TAB;
+  const viewTabs = views.map((v) =>
+    h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}`, "data-view-id": v.id },
+      h("button", {
+        type: "button",
+        class: `tab${v.id === activeId ? " active" : ""}`,
+        ...(locked ? {} : { title: "Drag to reorder (or Alt+Shift+←/→)" }),
+        onclick: () => selectTab(v.id),
+      }, v.name),
+    ),
+  );
   tabsListEl.replaceChildren(
     h("span", { class: `tab-wrap${onBoard ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onBoard ? " active" : ""}`, title: "Kanban", "aria-label": "Kanban", onclick: () => selectTab(BOARD_TAB) }, icon("viewColumns", "tab-svg")),
     ),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
-    ...views.map((v) =>
-      h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}` },
-        h("button", { type: "button", class: `tab${v.id === activeId ? " active" : ""}`, onclick: () => selectTab(v.id) }, v.name),
-      ),
-    ),
+    ...viewTabs,
   );
-  if (!locked) tabsListEl.append(h("button", { type: "button", class: "icon-btn tab-add", title: "Add view", "aria-label": "Add view", onclick: () => editView(null) }, icon("plusCircle", "icon-btn-svg")));
+  if (!locked) {
+    tabsListEl.append(h("button", { type: "button", class: "icon-btn tab-add", title: "Add view", "aria-label": "Add view", onclick: () => editView(null) }, icon("plusCircle", "icon-btn-svg")));
+    attachTabDrag(viewTabs, views.map((v) => v.id), moveViewTab, () => {
+      if (tabsPending) renderTabs();
+    });
+  }
+  if (focusedId !== null) viewTabs[views.findIndex((v) => v.id === focusedId)]?.querySelector<HTMLElement>(".tab")?.focus();
   placeTabIndicator();
+}
+
+/** Optimistically moves a view tab and saves the new order to views.yaml. */
+function moveViewTab(id: string, to: number): void {
+  const next = moveById(views, id, to);
+  if (next === views || viewsLocked()) return renderTabs();
+  views = next;
+  renderTabs();
+  saveViewsInOrder().then(
+    () => {
+      saveError = null;
+      renderChrome();
+    },
+    (e: Error) => {
+      saveError = e.message;
+      renderChrome();
+    },
+  );
+}
+
+function renderChrome(): void {
+  const locked = viewsLocked();
+  const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
+  const onBoard = activeId === BOARD_TAB;
+  renderTabs();
   const view = activeView();
   headerEl.replaceChildren();
   if (view) {

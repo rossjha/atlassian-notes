@@ -198,6 +198,10 @@ body {
   .ticket-grid th.th-draggable, .ticket-grid th.th-draggable .th-btn { cursor: grab; touch-action: pan-y; }
   .ticket-grid th.th-moving { opacity: 0.55; }
   html.cols-dragging, html.cols-dragging * { cursor: grabbing !important; user-select: none; }
+  /* View tab drag to reorder: same dimming and accent drop marker as the header drag. */
+  .tab-draggable, .tab-draggable .tab { touch-action: pan-y; }
+  .tab-wrap.tab-moving { opacity: 0.55; }
+  html.tabs-dragging, html.tabs-dragging * { cursor: grabbing !important; user-select: none; }
   .col-drop-marker { position: fixed; width: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; z-index: 50; }
   .display-toggle { flex: none; padding: 0 0.4rem; color: var(--muted); cursor: pointer; background: none; font-size: 12px; }
   .display-toggle:hover { color: var(--accent); }
