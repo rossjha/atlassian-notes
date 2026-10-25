@@ -64,6 +64,8 @@ test("maps ticket fields", async () => {
   assert.deepEqual(a.parent, { key: "PAY-100", summary: "Checkout epic" });
   assert.equal(a.assignee, "Alex Example");
   assert.deepEqual(a.labels, ["backend", "payments"]);
+  assert.deepEqual(a.components, ["API", "Checkout"]);
+  assert.deepEqual(b.components, []);
   assert.equal(b.sprint, "Sprint 3");
   assert.equal(b.storyPoints, null);
   assert.equal(b.priority, null);

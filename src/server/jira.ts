@@ -28,7 +28,7 @@ interface Opts {
 
 type Json = Record<string, any>;
 
-const BASE_FIELDS = ["summary", "status", "issuetype", "priority", "assignee", "reporter", "parent", "labels", "updated", "issuelinks"];
+const BASE_FIELDS = ["summary", "status", "issuetype", "priority", "assignee", "reporter", "parent", "labels", "components", "updated", "issuelinks"];
 
 /** Jira's "+0100" offsets sort wrongly as strings and don't parse everywhere; send ISO UTC. Invalid → raw. */
 function toIso(v: unknown): string {
@@ -118,6 +118,9 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
       storyPoints: typeof sp === "number" ? sp : null,
       parent: f.parent ? { key: f.parent.key, summary: f.parent.fields?.summary ?? "" } : null,
       labels: Array.isArray(f.labels) ? f.labels : [],
+      components: Array.isArray(f.components)
+        ? f.components.map((c: Json) => c?.name).filter((n: unknown): n is string => typeof n === "string")
+        : [],
       sprint: sprint?.name ?? null,
       sprints: sprints
         .filter((s) => typeof s?.name === "string")

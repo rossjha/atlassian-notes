@@ -63,6 +63,7 @@ test("renders front matter, tags and body", () => {
     sprints: [{ name: "Sprint 12", state: "active" }],
     sprint: "Sprint 12",
     labels: ["x"],
+    components: ["API"],
   });
   const custom: Record<string, CustomColumnDef> = {
     category: { label: "Category", type: "select", options: { "Tech debt": "amber" } },
@@ -87,6 +88,8 @@ sprints:
   - Sprint 12
 labels:
   - x
+components:
+  - API
 url: https://example.atlassian.net/browse/AAA-101
 parent: "[[jira/tickets/AAA-12|AAA-12]]"
 links:

@@ -59,10 +59,12 @@ test("null storyPoints sort last in both directions; numbers numeric", () => {
 });
 
 test("cellValue formats", () => {
-  const r = row("A-1", { labels: ["x", "y"], parent: { key: "E-1", summary: "e" }, storyPoints: 3 });
+  const r = row("A-1", { labels: ["x", "y"], components: ["API", "Web"], parent: { key: "E-1", summary: "e" }, storyPoints: 3 });
   r.groom = { readiness: "ready", summary: "ok", groomedAt: null };
   r.note = { body: "hi", mtimeMs: 0 };
   assert.equal(cellValue(r, "labels"), "x, y");
+  assert.equal(cellValue(r, "components"), "API, Web");
+  assert.equal(cellValue(row("A-2", {}), "components"), null);
   assert.equal(cellValue(r, "parent"), "E-1");
   assert.equal(cellValue(r, "storyPoints"), 3);
   assert.equal(cellValue(r, "groom"), "ready ok");

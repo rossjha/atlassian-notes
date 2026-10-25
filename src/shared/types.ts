@@ -18,7 +18,7 @@ export interface GroomFile extends NoteFile {
 
 export type BuiltinColumnId =
   | "key" | "summary" | "status" | "type" | "priority" | "assignee" | "reporter"
-  | "storyPoints" | "parent" | "labels" | "sprint" | "updated" | "note" | "groom"
+  | "storyPoints" | "parent" | "labels" | "components" | "sprint" | "updated" | "note" | "groom"
   | "noteUpdated" | "groomed";
 
 export const BUILTIN_COLUMNS: { id: BuiltinColumnId; label: string }[] = [
@@ -32,6 +32,7 @@ export const BUILTIN_COLUMNS: { id: BuiltinColumnId; label: string }[] = [
   { id: "storyPoints", label: "Points" },
   { id: "parent", label: "Parent" },
   { id: "labels", label: "Labels" },
+  { id: "components", label: "Components" },
   { id: "sprint", label: "Sprint" },
   { id: "updated", label: "Updated" },
   { id: "note", label: "My note" },
@@ -93,7 +94,8 @@ export interface Ticket {
   parent: { key: string; summary: string } | null;
   labels: string[];
   sprint: string | null;
-  // Optional: caches written before these existed lack them. The Jira client always sets both.
+  // Optional: caches written before these existed lack them. The Jira client always sets them.
+  components?: string[];
   sprints?: TicketSprint[];
   links?: TicketLink[];
   updated: string;

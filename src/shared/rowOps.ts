@@ -13,6 +13,7 @@ export function cellValue(row: Row, columnId: string): string | number | null {
     case "storyPoints": return t.storyPoints;
     case "parent": return t.parent ? t.parent.key : null;
     case "labels": return t.labels.length ? t.labels.join(", ") : null;
+    case "components": return t.components?.length ? t.components.join(", ") : null;
     case "sprint": return t.sprint;
     case "updated": return t.updated;
     case "note": return row.note ? row.note.body : null;

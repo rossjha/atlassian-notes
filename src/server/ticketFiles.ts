@@ -10,7 +10,7 @@ export const TICKETS_DIR = "jira/tickets";
 
 export const RESERVED_PROPS: readonly string[] = [
   "key", "summary", "status", "statusCategory", "type", "priority", "assignee",
-  "sprint", "sprints", "labels", "url", "parent", "links", "tags",
+  "sprint", "sprints", "labels", "components", "url", "parent", "links", "tags",
 ];
 
 export interface TicketFileContext {
@@ -63,6 +63,7 @@ export function renderTicketFile(t: Ticket, ctx: TicketFileContext): string {
     sprint: t.sprint,
     sprints: sprints.map((s) => s.name),
     labels: t.labels,
+    components: t.components ?? [],
     url: t.url,
     parent: t.parent ? ticketLink(t.parent.key) : null,
     links: [...new Set(links.map((l) => ticketLink(l.key)))],

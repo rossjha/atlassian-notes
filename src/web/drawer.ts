@@ -281,6 +281,7 @@ function detailsSection(t: Ticket): HTMLElement {
     ...field("Parent", t.parent ? keyLink(t.parent.key, t.parent.summary) : null),
     ...field("Sprint", sprint),
     ...field("Labels", t.labels.length ? h("span", { class: "dr-labels" }, ...t.labels.map((l) => h("span", { class: "pill" }, l))) : null),
+    ...field("Components", t.components?.length ? h("span", { class: "dr-labels" }, ...t.components.map((c) => h("span", { class: "pill" }, c))) : null),
     ...field("Updated", t.updated ? h("span", { title: t.updated }, relativeTime(t.updated)) : null),
     ...links.flatMap((g) => field(g.phrase.charAt(0).toUpperCase() + g.phrase.slice(1), h("span", { class: "dr-labels" }, ...g.keys.map((k) => keyLink(k))))),
   ));
