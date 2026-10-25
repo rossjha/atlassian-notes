@@ -1,5 +1,5 @@
 import type { NavLink } from "../shared/links.ts";
-import type { BoardOp, BoardResponse, ColumnsConfig, GroomFile, IssueDetail, NoteFile, Row, View } from "../shared/types.ts";
+import type { BoardOp, BoardResponse, ColumnsConfig, GroomFile, IssueDetail, NoteFile, ReadingItem, ReadingListResponse, ReadingSummary, Row, View } from "../shared/types.ts";
 
 export interface ConfigResponse {
   views: View[];
@@ -27,7 +27,11 @@ export interface TicketResponse {
   groom: GroomFile | null;
   groomHtml: string;
   groomPath: string;
+  reading: ReadingSummary[];
 }
+
+export type ReadingCopyKind = "link" | "note" | "both" | "prompt";
+export type ReadingPatch = Partial<{ title: string; url: string; status: string; category: string | null; tickets: string[] }>;
 
 export interface Orphan {
   key: string;
@@ -124,6 +128,35 @@ export const api = {
   },
   async refreshBoard(): Promise<BoardResponse> {
     return (await request("POST", "/api/board/refresh")).json() as Promise<BoardResponse>;
+  },
+  async readingList(): Promise<ReadingListResponse> {
+    return (await request("GET", "/api/reading")).json() as Promise<ReadingListResponse>;
+  },
+  async addReading(url: string): Promise<{ item: ReadingItem; existed: boolean }> {
+    return (await postJson("/api/reading", { url })).json() as Promise<{ item: ReadingItem; existed: boolean }>;
+  },
+  /** 422 (unparseable front matter) comes back as kind "invalid"; other failures throw. */
+  async saveReadingFields(id: string, patch: ReadingPatch): Promise<SaveResult> {
+    const res = await put(`/api/reading/${encodeURIComponent(id)}`, patch);
+    if (res.status === 422) {
+      const b = (await res.json().catch(() => ({}))) as { error?: string };
+      return { kind: "invalid", error: b.error ?? "Item could not be parsed" };
+    }
+    return saveResult(res);
+  },
+  async saveReadingNote(id: string, body: string, baseMtimeMs: number | null, force = false): Promise<SaveResult> {
+    const res = await put(`/api/reading/${encodeURIComponent(id)}/note`, { body, baseMtimeMs, ...(force ? { force: true } : {}) });
+    if (res.status === 422) {
+      const b = (await res.json().catch(() => ({}))) as { error?: string };
+      return { kind: "invalid", error: b.error ?? "Item could not be parsed" };
+    }
+    return saveResult(res);
+  },
+  async deleteReading(id: string): Promise<void> {
+    await request("DELETE", `/api/reading/${encodeURIComponent(id)}`);
+  },
+  async readingCopy(id: string, kind: ReadingCopyKind): Promise<string> {
+    return (await request("GET", `/api/reading/${encodeURIComponent(id)}/copy/${kind}`)).text();
   },
   async orphans(): Promise<Orphan[]> {
     return ((await (await request("GET", "/api/orphans")).json()) as { orphans: Orphan[] }).orphans;

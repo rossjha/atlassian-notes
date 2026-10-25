@@ -195,7 +195,8 @@ function onKeydown(e: KeyboardEvent): void {
   closeDrawer();
 }
 
-function toast(text: string): void {
+/** A short status message at the bottom of the screen (also used by the reading tab and panel). */
+export function toast(text: string): void {
   document.querySelector(".dr-toast")?.remove();
   clearTimeout(toastTimer);
   const el = h("div", { class: "dr-toast", role: "status" }, text);

@@ -1,4 +1,4 @@
-import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, Row, View } from "../shared/types.ts";
+import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, ReadingConfig, ReadingItem, Row, View } from "../shared/types.ts";
 import { icon, linkIcon, refreshButton } from "./icons.ts";
 import { confirmDialog, themePickerButton, viewSettingsButton } from "./viewMenu.ts";
 import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
@@ -6,7 +6,7 @@ import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
 import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
 import { h, relativeTime } from "./dom.ts";
-import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer, closeDrawer, currentDrawerKey } from "./drawer.ts";
+import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer, closeDrawer, currentDrawerKey, toast } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
 import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
@@ -22,6 +22,8 @@ import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme, currentTheme, saveTheme, THEMES } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
 import { initPalette } from "./palette.ts";
+import { clearReadingUrl, renderReading, type ReadingTabState } from "./reading.ts";
+import type { ReadingSortKey } from "../shared/reading.ts";
 import type { PaletteCommand } from "../shared/palette.ts";
 
 // Fallback: public/theme-init.js (a blocking script in <head>) normally applies the saved theme before first paint.
@@ -31,8 +33,10 @@ const TAB_KEY = "atlassian-notes.activeTab";
 /** Special tab id; never a view id (view ids can't contain "_"). */
 const BOARD_TAB = "__board";
 const SCRATCH_TAB = "__scratch";
-/** Kanban and Scratchpad: tabs that aren't Jira views. */
-const isFixedTab = (id: string | null): boolean => id === BOARD_TAB || id === SCRATCH_TAB;
+const READING_TAB = "__reading";
+/** Kanban, Scratchpad and Reading: tabs that aren't Jira views. */
+const isFixedTab = (id: string | null): boolean => id === BOARD_TAB || id === SCRATCH_TAB || id === READING_TAB;
+const READING_STATUS_KEY = "atlassian-notes.readingStatus";
 
 let views: View[] = [];
 let columns: ColumnsConfig | null = null;
@@ -61,6 +65,27 @@ let opError = false; // saveError was set by a star/board op
 const refreshingIds = new Set<string>();
 let rowsSeq = 0;
 let sort: SortState | null = null;
+// Reading tab
+let readingItems: ReadingItem[] = [];
+let readingConfig: ReadingConfig = { statuses: ["Pending"], doneStatus: "Pending", categories: [], prompts: [], groomPrompt: "" };
+let readingConfigError: string | null = null;
+let readingError: string | null = null;
+let readingLoaded = false;
+let readingSeq = 0;
+let readingFilter: { category: string | null; ticket: string | null } = { category: null, ticket: null };
+let readingSort: { by: ReadingSortKey; dir: "asc" | "desc" } = { by: "created", dir: "desc" };
+let readingNewId: string | null = null;
+let readingHint: string | null = null;
+let readingAdding = false;
+/** undefined = not chosen yet (the first status); null = All. Remembered in this browser. */
+let readingStatus: string | null | undefined = (() => {
+  try {
+    const v = localStorage.getItem(READING_STATUS_KEY);
+    return v === null ? undefined : v === "" ? null : v;
+  } catch {
+    return undefined;
+  }
+})();
 
 const root = document.body;
 const tabsListEl = h("div", { class: "tabs-list" });
@@ -373,12 +398,13 @@ async function commitJqlEdit(): Promise<void> {
   if (jqlEditor) el.focus();
 }
 
-/** Position along the tab bar: Kanban is 0, Scratchpad 1, then the views in order; -1 if unknown. */
+/** Position along the tab bar: Kanban is 0, Scratchpad 1, Reading 2, then the views in order; -1 if unknown. */
 function tabIndex(id: string | null): number {
   if (id === BOARD_TAB) return 0;
   if (id === SCRATCH_TAB) return 1;
+  if (id === READING_TAB) return 2;
   const i = views.findIndex((v) => v.id === id);
-  return i < 0 ? -1 : i + 2;
+  return i < 0 ? -1 : i + 3;
 }
 
 function selectTab(id: string): void {
@@ -403,6 +429,12 @@ function selectTab(id: string): void {
   if (id === SCRATCH_TAB) {
     rowsSeq++;
     withPageTransition(dir, paint, [headerEl, filterEl, tableEl, scratchEl]);
+    return;
+  }
+  if (id === READING_TAB) {
+    rowsSeq++;
+    withPageTransition(dir, paint, [headerEl, filterEl, tableEl, scratchEl]);
+    void loadReading();
     return;
   }
   sort = null;
@@ -452,6 +484,7 @@ function renderTabs(): void {
   const locked = viewsLocked();
   const onBoard = activeId === BOARD_TAB;
   const onScratch = activeId === SCRATCH_TAB;
+  const onReading = activeId === READING_TAB;
   const viewTabs = views.map((v) =>
     h("span", { class: `tab-wrap${v.id === activeId ? " active" : ""}`, "data-view-id": v.id },
       h("button", {
@@ -468,6 +501,9 @@ function renderTabs(): void {
     ),
     h("span", { class: `tab-wrap${onScratch ? " active" : ""}` },
       h("button", { type: "button", class: `tab tab-kanban${onScratch ? " active" : ""}`, title: "Scratchpad", "aria-label": "Scratchpad", onclick: () => selectTab(SCRATCH_TAB) }, icon("paintBrush", "tab-svg")),
+    ),
+    h("span", { class: `tab-wrap${onReading ? " active" : ""}` },
+      h("button", { type: "button", class: `tab tab-kanban${onReading ? " active" : ""}`, title: "Reading list", "aria-label": "Reading list", onclick: () => selectTab(READING_TAB) }, icon("eyeglasses", "tab-svg")),
     ),
     h("span", { class: "tabs-divider", "aria-hidden": "true" }, "|"),
     ...viewTabs,
@@ -525,6 +561,7 @@ function renderChrome(): void {
   const jqlHadFocus = jqlEditor !== null && document.activeElement === jqlEditor.el;
   const onBoard = activeId === BOARD_TAB;
   const onScratch = activeId === SCRATCH_TAB;
+  const onReading = activeId === READING_TAB;
   renderTabs();
   const view = activeView();
   headerEl.replaceChildren();
@@ -575,13 +612,19 @@ function renderChrome(): void {
       },
     }, `${orphans.length} orphaned ${orphans.length === 1 ? "note" : "notes"}`));
   }
-  headerEl.hidden = (onBoard || onScratch) && orphans.length === 0; // the board draws its own header; the scratchpad has none
+  headerEl.hidden = (onBoard || onScratch || onReading) && orphans.length === 0; // the board draws its own header; the scratchpad has none
   orphansEl.hidden = !(orphansOpen && orphans.length > 0);
   orphansEl.replaceChildren(
     h("div", { class: "text-muted" }, "Notes whose ticket is no longer found in Jira. The files are left untouched."),
     ...orphans.map((o) => h("div", { class: "orphan-row" }, h("code", { class: "key" }, o.key), h("code", { class: "text-muted" }, o.notePath), h("code", { class: "text-muted" }, o.groomPath))),
   );
-  const err = [...(onBoard ? [boardData?.error, boardError, opError ? saveError : null] : onScratch ? [] : [configError ?? rowsError, saveError]), linksError].filter(Boolean).join("\n");
+  const err = [
+    ...(onBoard ? [boardData?.error, boardError, opError ? saveError : null]
+      : onScratch ? []
+      : onReading ? [readingConfigError, readingError, opError ? saveError : null]
+      : [configError ?? rowsError, saveError]),
+    linksError,
+  ].filter(Boolean).join("\n");
   errorEl.textContent = err;
   errorEl.hidden = !err;
 }
@@ -731,6 +774,12 @@ function renderBody(): void {
     void showScratchpad(scratchEl);
     return;
   }
+  if (activeId === READING_TAB) {
+    filterEl.replaceChildren();
+    filterEl.hidden = true;
+    renderReadingTab();
+    return;
+  }
   if (activeId === BOARD_TAB) {
     filterEl.replaceChildren();
     filterEl.hidden = true;
@@ -782,6 +831,7 @@ async function loadConfig(): Promise<void> {
   renderChrome();
   renderBody();
   if (activeId === BOARD_TAB) await loadBoard();
+  else if (activeId === READING_TAB) await loadReading();
   else if (activeId !== SCRATCH_TAB) await loadRows();
 }
 
@@ -862,6 +912,112 @@ function onLive(e: LiveEvent): void {
     case "orphans":
       void loadOrphans();
       break;
+    case "reading":
+    case "readingGroom":
+    case "readingConfig":
+      if (activeId === READING_TAB) void loadReading();
+      if (activeId === BOARD_TAB) void loadBoard();
+      break;
+  }
+}
+
+function readingTabState(): ReadingTabState {
+  const status = readingStatus === undefined ? readingConfig.statuses[0] ?? null : readingStatus;
+  return {
+    items: readingItems,
+    config: readingConfig,
+    loaded: readingLoaded,
+    status,
+    category: readingFilter.category,
+    ticket: readingFilter.ticket,
+    sort: readingSort,
+    newId: readingNewId,
+    hint: readingHint,
+    adding: readingAdding,
+  };
+}
+
+function setReadingStatus(status: string | null): void {
+  readingStatus = status;
+  try {
+    localStorage.setItem(READING_STATUS_KEY, status ?? "");
+  } catch {
+    // storage unavailable
+  }
+  renderBody();
+}
+
+function renderReadingTab(): void {
+  renderReading(tableEl, readingTabState(), {
+    onAdd: (url) => void addReading(url),
+    onOpen: (id) => openReading(id),
+    onOpenTicket: (key) => openDrawer(key),
+    onStatusTab: setReadingStatus,
+    onFilter: (f) => {
+      readingFilter = { ...readingFilter, ...f };
+      renderBody();
+    },
+    onSort: (by) => {
+      readingSort = readingSort.by === by ? { by, dir: readingSort.dir === "asc" ? "desc" : "asc" } : { by, dir: by === "title" || by === "status" || by === "category" || by === "tickets" ? "asc" : "desc" };
+      renderBody();
+    },
+    onHintClear: () => {
+      if (readingHint === null) return;
+      readingHint = null;
+      renderBody();
+    },
+    star: { isStarred: (k) => boardKeys.has(k), toggle: toggleStar, disabled: !boardReady || boardLocked, locked: boardReady && boardLocked },
+  });
+}
+
+async function loadReading(): Promise<void> {
+  const seq = ++readingSeq;
+  try {
+    const r = await api.readingList();
+    if (seq !== readingSeq) return;
+    readingItems = r.items;
+    readingConfig = r.config;
+    readingConfigError = r.error;
+    readingError = null;
+  } catch (e) {
+    if (seq !== readingSeq) return;
+    readingError = (e as Error).message;
+  }
+  readingLoaded = true;
+  if (activeId === READING_TAB) {
+    renderChrome();
+    renderBody();
+  }
+}
+
+/** The reading side panel arrives with the next change; until then a row opens its link. */
+function openReading(id: string): void {
+  const item = readingItems.find((i) => i.id === id);
+  if (item?.url) window.open(item.url, "_blank", "noopener,noreferrer");
+}
+
+async function addReading(url: string): Promise<void> {
+  if (readingAdding) return;
+  readingAdding = true;
+  readingHint = null;
+  renderBody();
+  try {
+    const { item, existed } = await api.addReading(url);
+    clearReadingUrl();
+    if (existed) {
+      toast("Already on your list");
+      openReading(item.id);
+    } else {
+      readingNewId = item.id;
+      // Show it where it landed: its status sub-tab, unless All is showing.
+      if (readingStatus !== null && readingTabState().status !== item.status) setReadingStatus(item.status);
+    }
+    await loadReading();
+  } catch (e) {
+    readingHint = (e as Error).message;
+  } finally {
+    readingAdding = false;
+    renderBody();
   }
 }
 
