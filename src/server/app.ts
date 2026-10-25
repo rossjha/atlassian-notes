@@ -25,7 +25,9 @@ export interface AppDeps {
   publicDir: string;
 }
 
-const CSP = "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+// img-src adds data: and blob: for images pasted or dropped into the Scratchpad (Excalidraw decodes them from
+// in-memory URLs). Neither reaches the network; fetches, scripts and fonts stay 'self'.
+const CSP = "default-src 'self'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const MAX_BODY = 1024 * 1024;
 /** Scratchpad scenes embed pasted images as data URLs, so they get a larger limit. */
 const MAX_SCRATCHPAD_BODY = 50 * 1024 * 1024;

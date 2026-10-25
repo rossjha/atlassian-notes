@@ -196,7 +196,7 @@ test("static: serves index, never outside publicDir, only GET/HEAD, headers on a
     const r = await fetch(base() + p);
     assert.equal(
       r.headers.get("content-security-policy"),
-      "default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'self'; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     );
     assert.equal(r.headers.get("x-content-type-options"), "nosniff");
   }

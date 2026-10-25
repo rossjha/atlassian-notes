@@ -139,5 +139,5 @@ The app uses the Carbon theme by default (near-black, one yellow accent, square 
 ## Privacy
 
 - Only HTTP GET requests, only to your Jira site (or `api.atlassian.com` for scoped tokens). The app cannot change anything in Jira.
-- The server listens on 127.0.0.1 only. The page loads nothing from outside (CSP `default-src 'self'`): no CDNs, fonts, analytics or telemetry.
+- The server listens on 127.0.0.1 only. The page loads nothing from outside (CSP `default-src 'self'`; images may also be in-memory `data:`/`blob:` URLs, for pictures dropped into the Scratchpad): no CDNs, fonts, analytics or telemetry.
 - The token lives only in `~/.config/atlassian-notes/.env`; `setup` never prints it.
