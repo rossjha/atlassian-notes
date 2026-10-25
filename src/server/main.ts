@@ -10,7 +10,7 @@ import { ViewCache } from "./cache.ts";
 import { ConfigError, loadConfig, type Config } from "./config.ts";
 import { ensureDataDir, loadColumns, loadReadingConfig, loadViews } from "./configFiles.ts";
 import { createJiraClient, type JiraClient } from "./jira.ts";
-import { NotesStore } from "./notesStore.ts";
+import { keepTmpFilesUnder, NotesStore } from "./notesStore.ts";
 import { ReadingStore } from "./readingStore.ts";
 import { Refresher } from "./refresher.ts";
 import { createTicketFileSyncer, syncTicketFiles } from "./ticketFiles.ts";
@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     }
     throw e;
   }
+  keepTmpFilesUnder(config.notesDir);
   await ensureDataDir(config.notesDir, config.defaultProject, path.join(root, "examples"));
 
   const makeClient = async (): Promise<JiraClient> =>

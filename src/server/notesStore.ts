@@ -12,12 +12,28 @@ export type WriteResult =
 type Kind = "notes" | "groom";
 
 let tmpCounter = 0;
+let tmpRoot: string | null = null;
+
+/**
+ * Writes for files inside `notesDir` stage their tmp file in `notesDir/.cache/tmp` instead of beside the file, so
+ * Obsidian (with the notes folder open as a vault) never sees a stray file appear and vanish. Same folder tree, so
+ * the rename stays on one filesystem. `null` restores tmp files beside the target.
+ */
+export function keepTmpFilesUnder(notesDir: string | null): void {
+  tmpRoot = notesDir === null ? null : path.resolve(notesDir);
+}
+
+/** Unique per call so concurrent writes to the same file never share a tmp file. The watcher ignores ".tmp-" names. */
+export function tmpPathFor(file: string): string {
+  const name = `${path.basename(file)}.tmp-${process.pid}-${++tmpCounter}-${Math.random().toString(36).slice(2, 10)}`;
+  const inNotes = tmpRoot !== null && path.resolve(file).startsWith(tmpRoot + path.sep);
+  return path.join(inNotes ? path.join(tmpRoot!, ".cache", "tmp") : path.dirname(file), name);
+}
 
 export async function atomicWrite(file: string, content: string): Promise<void> {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  // Unique per call so concurrent writes to the same file never share a tmp file.
-  // The watcher ignores names containing ".tmp-".
-  const tmp = `${file}.tmp-${process.pid}-${++tmpCounter}-${Math.random().toString(36).slice(2, 10)}`;
+  const tmp = tmpPathFor(file);
+  await fs.mkdir(path.dirname(tmp), { recursive: true });
   try {
     await fs.writeFile(tmp, content, "utf8");
     await fs.rename(tmp, file);

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { NotesStore, atomicWrite } from "../src/server/notesStore.ts";
+import { NotesStore, atomicWrite, keepTmpFilesUnder, tmpPathFor } from "../src/server/notesStore.ts";
 import { InvalidKeyError, parseFrontMatter } from "../src/server/frontMatter.ts";
 
 let dir: string;
@@ -14,6 +14,7 @@ beforeEach(async () => {
   store = new NotesStore(dir);
 });
 afterEach(async () => {
+  keepTmpFilesUnder(null);
   await fs.rm(dir, { recursive: true, force: true });
 });
 
@@ -75,6 +76,33 @@ test("atomicWrite removes its tmp file when the rename fails", async () => {
   await fs.mkdir(path.join(target, "child"), { recursive: true });
   await assert.rejects(atomicWrite(target, "x"));
   assert.deepEqual((await fs.readdir(dir)).filter((n) => n.includes(".tmp-")), []);
+});
+
+test("tmp files for the notes folder go under .cache/tmp, out of Obsidian's sight", () => {
+  keepTmpFilesUnder("/n");
+  assert.match(tmpPathFor("/n/jira/notes/PAY-1.md"), /^\/n\/\.cache\/tmp\/PAY-1\.md\.tmp-/);
+  assert.match(tmpPathFor("/n/views.yaml"), /^\/n\/\.cache\/tmp\/views\.yaml\.tmp-/);
+  assert.match(tmpPathFor("/n/.cache/views/a.json"), /^\/n\/\.cache\/tmp\/a\.json\.tmp-/);
+});
+
+test("tmp files outside the notes folder (or with none set) sit beside the file", () => {
+  assert.match(tmpPathFor("/n/views.yaml"), /^\/n\/views\.yaml\.tmp-/);
+  keepTmpFilesUnder("/n");
+  assert.match(tmpPathFor("/other/x.json"), /^\/other\/x\.json\.tmp-/);
+  assert.match(tmpPathFor("/notes-elsewhere/x.json"), /^\/notes-elsewhere\/x\.json\.tmp-/);
+});
+
+test("with a notes folder set, atomicWrite leaves no tmp files in the target folder or .cache/tmp", async () => {
+  keepTmpFilesUnder(dir);
+  const file = path.join(dir, "jira", "notes", "PAY-1.md");
+  await Promise.all(Array.from({ length: 8 }, (_, i) => atomicWrite(file, `v${i}\n`)));
+  assert.match(await fs.readFile(file, "utf8"), /^v\d\n$/);
+  assert.deepEqual(await fs.readdir(path.dirname(file)), ["PAY-1.md"]);
+  assert.deepEqual(await fs.readdir(path.join(dir, ".cache", "tmp")), []);
+  const target = path.join(dir, "adir");
+  await fs.mkdir(path.join(target, "child"), { recursive: true });
+  await assert.rejects(atomicWrite(target, "x"));
+  assert.deepEqual(await fs.readdir(path.join(dir, ".cache", "tmp")), []);
 });
 
 test("null base mtime with existing file conflicts", async () => {
