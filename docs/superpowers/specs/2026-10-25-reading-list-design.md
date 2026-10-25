@@ -1,6 +1,6 @@
 # Reading list: design
 
-Date: 2026-10-25. Status: draft for review.
+Date: 2026-10-25. Status: approved by the user 2026-10-25.
 
 ## Intent
 
@@ -22,6 +22,7 @@ The user said they might otherwise track reading on an Obsidian Kanban. The poin
 
 - Fetching anything from the linked page (title, content or preview). The app only ever contacts Jira, and that doesn't change. Titles are guessed from the URL and the user can edit them.
 - Relating reading items to each other. The user is "not too fussed here just yet". Links to tickets are enough for v1.
+- Fetching linked tickets that aren't in any view or on the board (the user decided: leave for now). Such a ticket shows as its bare key, with no title or status. It has no `jira/tickets/<KEY>.md` hub file, so the "Reading" backlinks exist only for tickets that already have one, and the reading item's `links:` entry for it is a dangling wikilink in Obsidian. Ticket chips for uncached keys still open the ticket side panel, which fetches that ticket on demand as it already does for searched keys.
 - Tags beyond a single category.
 - Per-view column configuration for the reading table, which Jira views have.
 
