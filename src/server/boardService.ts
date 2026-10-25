@@ -24,6 +24,8 @@ export interface BoardServiceDeps {
   now?: () => Date;
   /** Reading list cards (reading:<id>): their summary for the board, and marking archived ones done. */
   reading?: { summary(id: string): Promise<ReadingSummary | null>; markDone(ids: string[]): Promise<void> };
+  /** A board ticket turned out to have a new key: lets the reading list follow. */
+  onTicketRenamed?: (oldKey: string, newKey: string) => Promise<void>;
 }
 
 const isTicketCard = (key: string): boolean => readingIdFromCard(key) === null;
@@ -150,6 +152,7 @@ export class BoardService {
                 console.error(`board rename ${key} -> ${found.key}: ${res}; note stays under ${key}`);
               }
             }
+            await this.deps.onTicketRenamed?.(key, found.key);
             onChange({ type: "board" });
           } catch (e) {
             console.error(`board rename ${key} -> ${found.key} failed:`, errMessage(e));

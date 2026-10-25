@@ -203,3 +203,18 @@ test("refreshAll writes jira/tickets files through the real syncer", async () =>
   await r.refreshAll();
   assert.ok(fs.existsSync(path.join(dir, "jira", "tickets", "PAY-1.md")));
 });
+
+test("refresher calls onTicketRenamed for each reconcile rename", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-rename-"));
+  const notes = new NotesStore(dir);
+  await notes.writeNoteBody("OLD-1", "x", { baseMtimeMs: null, jiraId: "600" });
+  const renamed: [string, string][] = [];
+  const r = new Refresher({
+    jira: { search: async () => [t("600", "NEW-1")], getIssueBrief: async () => null, getIssueDetail: async () => { throw new Error("x"); } } as unknown as JiraClient,
+    cache: new ViewCache(dir), notes, getViews: async () => [view], onChange: () => {},
+    statePath: path.join(dir, ".cache", "reconcile.json"),
+    onTicketRenamed: async (o, n) => { renamed.push([o, n]); },
+  });
+  await r.refreshAll();
+  assert.deepEqual(renamed, [["OLD-1", "NEW-1"]]);
+});

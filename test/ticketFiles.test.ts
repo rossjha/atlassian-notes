@@ -317,3 +317,20 @@ test("sync called from a waiter's continuation never overlaps runs", async () =>
   assert.equal(maxActive, 1);
   assert.ok(runs >= 2);
 });
+
+const rs = (id: string, title: string) => ({ id, title, status: "Pending", url: `https://example.com/${id}`, source: "web" as const });
+
+test("renderTicketFile lists linked reading items as wikilinks after Groom", () => {
+  const out = renderTicketFile(ticket("AAA-1"), { ...noCtx, hasGroom: true, reading: [rs("2026-10-25-a", "Retry [draft] | v2"), rs("2026-10-25-b", "Runbook")] });
+  const lines = out.split("\n");
+  const g = lines.indexOf("- Groom: [[jira/groom/AAA-1|groom]]");
+  assert.ok(g >= 0, out);
+  assert.equal(lines[g + 1], "- Reading: [[reading/items/2026-10-25-a|Retry draft v2]]");
+  assert.equal(lines[g + 2], "- Reading: [[reading/items/2026-10-25-b|Runbook]]");
+});
+
+test("syncTicketFiles writes Reading lines from getReadingIndex", async () => {
+  await cache.write("v1", { fetchedAt: T1, tickets: [ticket("AAA-1")], error: null });
+  await syncTicketFiles({ ...deps(), getReadingIndex: async () => new Map([["AAA-1", [rs("2026-10-25-a", "Runbook")]]]) });
+  assert.ok((await fs.readFile(tpath("AAA-1"), "utf8")).includes("- Reading: [[reading/items/2026-10-25-a|Runbook]]"));
+});

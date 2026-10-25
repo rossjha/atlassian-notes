@@ -76,12 +76,17 @@ async function main(): Promise<void> {
   const reading = new ReadingStore(config.notesDir);
   const cache = new ViewCache(config.notesDir);
   let broadcast: (e: LiveEvent) => void = () => {};
+  // A ticket moved project: reading items that link the old key follow it (front matter only).
+  const onTicketRenamed = async (oldKey: string, newKey: string): Promise<void> => {
+    for (const id of await reading.renameTicketKey(oldKey, newKey)) broadcast({ type: "reading", id });
+  };
   const board = new BoardService({
     jira,
     cache,
     notes,
     notesDir: config.notesDir,
     statePath: path.join(config.notesDir, ".cache", "board-state.json"),
+    onTicketRenamed,
     onChange: (e) => broadcast(e),
     reading: {
       summary: async (id) => {
@@ -106,6 +111,7 @@ async function main(): Promise<void> {
       cache,
       notes,
       getCustom: async () => (await loadColumns(config.notesDir)).custom,
+      getReadingIndex: () => reading.ticketIndex(),
       getViewIds: async () =>
         (await loadViews(config.notesDir, await loadColumns(config.notesDir))).map((v) => v.id),
     }),
@@ -119,6 +125,7 @@ async function main(): Promise<void> {
     getViews: async () => loadViews(config.notesDir, await loadColumns(config.notesDir)),
     onChange: (e) => broadcast(e),
     statePath: path.join(config.notesDir, ".cache", "reconcile.json"),
+    onTicketRenamed,
   });
   const app = createApp({ config, jira, notes, cache, refresher, board, reading, publicDir: path.join(root, "public") });
   broadcast = app.broadcast;
@@ -137,7 +144,7 @@ async function main(): Promise<void> {
     if (e.type === "columns") {
       makeClient().then((c) => { inner = c; }, () => {});
     }
-    if (e.type === "note" || e.type === "groom" || e.type === "columns") ticketFiles.schedule();
+    if (e.type === "note" || e.type === "groom" || e.type === "columns" || e.type === "reading") ticketFiles.schedule();
     app.broadcast(e);
   });
 

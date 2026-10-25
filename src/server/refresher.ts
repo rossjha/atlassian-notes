@@ -19,6 +19,8 @@ export interface RefresherDeps {
     tickets(): Promise<Map<string, Ticket>>;
     rename(oldKey: string, newKey: string): Promise<void>;
   };
+  /** A ticket moved to a new key (reconcile found it): lets the reading list follow. */
+  onTicketRenamed?: (oldKey: string, newKey: string) => Promise<void>;
 }
 
 export class Refresher {
@@ -107,6 +109,13 @@ export class Refresher {
           await board.rename(oldKey, newKey);
         } catch (e) {
           console.error(`board rename ${oldKey} -> ${newKey} failed:`, e instanceof Error ? e.message : e);
+        }
+      }
+      if (this.deps.onTicketRenamed) {
+        try {
+          await this.deps.onTicketRenamed(oldKey, newKey);
+        } catch (e) {
+          console.error(`reading rename ${oldKey} -> ${newKey} failed:`, e instanceof Error ? e.message : e);
         }
       }
       onChange({ type: "note", key: newKey });
