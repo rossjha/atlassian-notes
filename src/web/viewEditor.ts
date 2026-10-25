@@ -53,7 +53,7 @@ export function openViewEditor(
   name.value = view?.name ?? "";
   const jql = h("textarea", { class: "ve-input", id: "ve-jql", rows: "3" }) as HTMLTextAreaElement;
   jql.value = view?.jql ?? "";
-  const limit = h("input", { type: "number", class: "ve-input ve-limit", id: "ve-limit", min: "1", max: "1000", step: "1" }) as HTMLInputElement;
+  const limit = h("input", { type: "number", class: "ve-input ve-limit", id: "ve-limit", min: "1", max: "2000", step: "1" }) as HTMLInputElement;
   limit.value = String(view?.limit ?? DEFAULT_LIMIT);
   const message = h("div", { class: "editor-msg", role: "alert" });
   message.hidden = true;
@@ -131,7 +131,7 @@ export function openViewEditor(
     const limitV = Number(limit.value);
     if (!nameV) return showError("Name is required");
     if (!jqlV) return showError("JQL is required");
-    if (!Number.isInteger(limitV) || limitV < 1 || limitV > 1000) return showError("Limit must be a whole number from 1 to 1000");
+    if (!Number.isInteger(limitV) || limitV < 1 || limitV > 2000) return showError("Limit must be a whole number from 1 to 2000");
     const next: View = {
       id: view?.id ?? slugify(nameV),
       name: nameV,

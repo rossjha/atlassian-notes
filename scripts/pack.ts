@@ -15,6 +15,7 @@ export const PACK_INCLUDE: string[] = [
   "scripts",
   "src",
   "public/index.html",
+  "public/favicon.svg",
   "public/fonts",
   "public/theme-init.js",
 ];
