@@ -663,3 +663,16 @@ test("DELETE /api/reading/<id> also removes its Kanban card", async () => {
   assert.equal((await fetch(base() + `/api/reading/${id}`, { method: "DELETE", headers: J, body: "{}" })).status, 204);
   assert.ok(!fs.readFileSync(boardFile(), "utf8").includes(`reading:${id}`));
 });
+
+test("PUT /api/reading/<id>/note with baseBody survives a field change made while the editor was open", async () => {
+  const id = await addItem("https://example.com/editor-open");
+  await put(`/api/reading/${id}/note`, { body: "start", baseMtimeMs: null, force: true });
+  const opened = (await (await fetch(base() + `/api/reading/${id}`)).json()).item;
+  await put(`/api/reading/${id}`, { status: "Complete" });
+  const res = await put(`/api/reading/${id}/note`, { body: "typed", baseMtimeMs: opened.mtimeMs, baseBody: "start" });
+  assert.equal(res.status, 200);
+  const after = (await (await fetch(base() + `/api/reading/${id}`)).json()).item;
+  assert.equal(after.note, "typed");
+  assert.equal(after.status, "Complete");
+  assert.equal((await put(`/api/reading/${id}/note`, { body: "x", baseMtimeMs: null, baseBody: 5 })).status, 400);
+});

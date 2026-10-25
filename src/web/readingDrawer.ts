@@ -330,8 +330,8 @@ function noteSection(it: ReadingItem): HTMLElement {
       get note() {
         return note;
       },
-      async save(body, base, force) {
-        const r = await api.saveReadingNote(it.id, body, base, force);
+      async save(body, base, force, baseBody) {
+        const r = await api.saveReadingNote(it.id, body, base, force, baseBody);
         if (r.kind === "ok") note = { body, mtimeMs: r.mtimeMs };
         return r;
       },

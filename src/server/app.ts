@@ -313,8 +313,13 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
       if (typeof body.body !== "string") throw new HttpError(400, "body must be a string");
       const base = body.baseMtimeMs ?? null;
       if (base !== null && typeof base !== "number") throw new HttpError(400, "baseMtimeMs must be a number or null");
+      if (body.baseBody !== undefined && typeof body.baseBody !== "string") throw new HttpError(400, "baseBody must be a string");
       if (!(await reading.read(id))) throw new HttpError(404, "No such reading item");
-      sendWrite(res, await reading.writeNote(id, body.body, { baseMtimeMs: base, force: body.force === true }));
+      sendWrite(res, await reading.writeNote(id, body.body, {
+        baseMtimeMs: base,
+        ...(typeof body.baseBody === "string" ? { baseBody: body.baseBody } : {}),
+        force: body.force === true,
+      }));
       return true;
     }
     if (segs.length === 4 && c === "copy" && d && method === "GET") {

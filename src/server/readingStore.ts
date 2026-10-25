@@ -114,11 +114,16 @@ export class ReadingStore {
     return this.itemPath(id);
   }
 
+  /** Every readable item; one unreadable file is logged and skipped so it can't break the list, the ticket panel or hub files. */
   async list(): Promise<ReadingItem[]> {
     const items: ReadingItem[] = [];
     for (const id of await this.ids()) {
-      const item = await this.read(id);
-      if (item) items.push(item);
+      try {
+        const item = await this.read(id);
+        if (item) items.push(item);
+      } catch (e) {
+        console.error(`reading item ${id} could not be read:`, e instanceof Error ? e.message : e);
+      }
     }
     return items;
   }
@@ -167,11 +172,16 @@ export class ReadingStore {
     });
   }
 
-  writeNote(id: string, body: string, opts: { baseMtimeMs: number | null; force?: boolean }): Promise<WriteResult> {
+  /**
+   * `baseBody` is the note the editor opened with. Fields share the file, so a status change (or a Kanban archive, or a
+   * key rename) moves the mtime; when the body on disk is still `baseBody`, only front matter changed and the save goes ahead.
+   */
+  writeNote(id: string, body: string, opts: { baseMtimeMs: number | null; baseBody?: string; force?: boolean }): Promise<WriteResult> {
     return this.serial(id, async () => {
       const raw = await this.readRaw(id);
       if (!raw) return { ok: false, conflict: null, reason: "conflict" };
-      if (!opts.force && opts.baseMtimeMs !== raw.mtimeMs) return { ok: false, conflict: this.noteFile(raw), reason: "conflict" };
+      const bodyUnchanged = opts.baseBody !== undefined && raw.body === opts.baseBody;
+      if (!opts.force && opts.baseMtimeMs !== raw.mtimeMs && !bodyUnchanged) return { ok: false, conflict: this.noteFile(raw), reason: "conflict" };
       if (raw.parseError) return { ok: false, conflict: this.noteFile(raw), reason: "parse-error" };
       return this.write(id, raw.data, body);
     });
@@ -282,12 +292,16 @@ export class ReadingStore {
     const f = await this.readText(this.itemPath(id));
     if (!f) return null;
     const doc = parseFrontMatter(f.text);
-    return { id, data: doc.data, body: doc.body, mtimeMs: f.mtimeMs, birthtimeMs: f.birthtimeMs, parseError: doc.error };
+    // Every item the app writes has front matter. Without it (or with the closing --- deleted by hand) a write would stack
+    // a new block on top and push the old one into the note, so treat it as broken and leave the file alone.
+    const parseError = doc.error ?? (doc.hasFrontMatter ? null : /^---\r?\n/.test(f.text) ? "front matter has no closing ---" : "no front matter");
+    return { id, data: doc.data, body: doc.body, mtimeMs: f.mtimeMs, birthtimeMs: f.birthtimeMs, parseError };
   }
 
   private async toItem(raw: RawFile): Promise<ReadingItem> {
     const d = raw.data;
-    const url = typeof d.url === "string" ? d.url : "";
+    // Only http(s) is ever handed out as a link: a hand-edited (or shared) file could carry javascript: or the like.
+    const url = typeof d.url === "string" ? normaliseUrl(d.url) ?? "" : "";
     const source = SOURCES.includes(d.source as ReadingSource) ? (d.source as ReadingSource) : guessFromUrl(url, null).source;
     const birth = raw.birthtimeMs > 0 ? raw.birthtimeMs : raw.mtimeMs;
     const g = await this.readText(this.groomPath(raw.id));

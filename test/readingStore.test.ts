@@ -193,3 +193,56 @@ test("ticketIndex maps PAY-40 to the two items that link it", async () => {
   assert.deepEqual(idx.get("PAY-40")?.map((s) => s.title), ["example.com: alpha", "example.com: zeta"]);
   assert.deepEqual(idx.get("PAY-41")?.map((s) => s.id), [b, c]);
 });
+
+test("a hand-edited non-http(s) url is never handed out as a link", async () => {
+  await fs.mkdir(path.dirname(itemFile("2026-10-01-js")), { recursive: true });
+  await fs.writeFile(itemFile("2026-10-01-js"), '---\nid: 2026-10-01-js\nurl: "javascript:alert(1)"\ntitle: Evil\nstatus: Pending\n---\n');
+  const item = await store.read("2026-10-01-js");
+  assert.equal(item?.url, "");
+  assert.equal(item?.title, "Evil");
+});
+
+test("front matter missing its closing --- (or missing entirely) is a parse error, and writes leave the file alone", async () => {
+  await fs.mkdir(path.dirname(itemFile("2026-10-01-open")), { recursive: true });
+  const open = "---\nurl: https://example.com/x\ntitle: Hello\nstatus: Pending\n\nmy note\n";
+  await fs.writeFile(itemFile("2026-10-01-open"), open);
+  await fs.writeFile(itemFile("2026-10-01-bare"), "just a note\n");
+  for (const id of ["2026-10-01-open", "2026-10-01-bare"]) {
+    const item = await store.read(id);
+    assert.ok(item?.parseError, id);
+    const r = await store.setFields(id, { status: "Complete" });
+    assert.ok(!r.ok && r.reason === "parse-error", id);
+  }
+  assert.equal(await fs.readFile(itemFile("2026-10-01-open"), "utf8"), open);
+});
+
+test("a note save after a field-only change on disk is accepted when the body it started from is unchanged", async () => {
+  await store.add(CONF, opts);
+  await store.writeNote(ID, "original\n", { baseMtimeMs: null, force: true });
+  const opened = (await store.read(ID))!;
+  await store.setFields(ID, { status: "Complete" }); // e.g. the status select, a Kanban archive, a key rename
+  const stale = await store.writeNote(ID, "typed\n", { baseMtimeMs: opened.mtimeMs });
+  assert.ok(!stale.ok, "without baseBody it is still a conflict");
+  const ok = await store.writeNote(ID, "typed\n", { baseMtimeMs: opened.mtimeMs, baseBody: "original\n" });
+  assert.ok(ok.ok);
+  const item = await store.read(ID);
+  assert.equal(item?.note, "typed\n");
+  assert.equal(item?.status, "Complete");
+  await store.writeNote(ID, "someone else\n", { baseMtimeMs: null, force: true });
+  const real = await store.writeNote(ID, "mine\n", { baseMtimeMs: opened.mtimeMs, baseBody: "typed\n" });
+  assert.ok(!real.ok && real.reason === "conflict", "a real body change is still a conflict");
+});
+
+test("one unreadable item file doesn't break list or ticketIndex", async () => {
+  const a = (await store.add("https://example.com/fine", opts)).item.id;
+  await store.setFields(a, { tickets: ["PAY-1"] });
+  await fs.mkdir(itemFile("2026-10-01-oops"), { recursive: true }); // a directory named like an item
+  const warn = console.error;
+  console.error = () => {};
+  try {
+    assert.deepEqual((await store.list()).map((i) => i.id), [a]);
+    assert.deepEqual((await store.ticketIndex()).get("PAY-1")?.map((s) => s.id), [a]);
+  } finally {
+    console.error = warn;
+  }
+});

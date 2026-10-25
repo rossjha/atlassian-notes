@@ -154,8 +154,8 @@ export const api = {
     }
     return saveResult(res);
   },
-  async saveReadingNote(id: string, body: string, baseMtimeMs: number | null, force = false): Promise<SaveResult> {
-    const res = await put(`/api/reading/${encodeURIComponent(id)}/note`, { body, baseMtimeMs, ...(force ? { force: true } : {}) });
+  async saveReadingNote(id: string, body: string, baseMtimeMs: number | null, force = false, baseBody?: string): Promise<SaveResult> {
+    const res = await put(`/api/reading/${encodeURIComponent(id)}/note`, { body, baseMtimeMs, ...(baseBody !== undefined ? { baseBody } : {}), ...(force ? { force: true } : {}) });
     if (res.status === 422) {
       const b = (await res.json().catch(() => ({}))) as { error?: string };
       return { kind: "invalid", error: b.error ?? "Item could not be parsed" };

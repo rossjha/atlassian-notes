@@ -35,7 +35,8 @@ export interface NoteEditorOptions {
 export interface EditableDoc {
   label: string;
   note: { body: string; mtimeMs: number } | null;
-  save(body: string, baseMtimeMs: number | null, force: boolean): Promise<SaveResult>;
+  /** `baseBody` is the text the editor opened with (or last saved/reloaded). */
+  save(body: string, baseMtimeMs: number | null, force: boolean, baseBody: string): Promise<SaveResult>;
 }
 
 export function editNote(cell: HTMLElement, row: Row, onDone: () => void, options: NoteEditorOptions = {}): void {
@@ -95,7 +96,7 @@ export function editMarkdown(cell: HTMLElement, doc: EditableDoc, onDone: () => 
     const text = area.value;
     let result: SaveResult;
     try {
-      result = await doc.save(text, baseMtimeMs, force);
+      result = await doc.save(text, baseMtimeMs, force, original);
     } catch (e) {
       saving = false;
       showMessage((e as Error).message, null);
