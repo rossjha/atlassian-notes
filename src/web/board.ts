@@ -1,6 +1,7 @@
 import { locate } from "../shared/boardOps.ts";
 import type { BoardCard, BoardOp, BoardResponse, Row } from "../shared/types.ts";
 import { h, relativeTime } from "./dom.ts";
+import { icon } from "./icons.ts";
 import { refreshButton } from "./icons.ts";
 import { editNote, isEditing } from "./editors.ts";
 
@@ -49,18 +50,32 @@ function cardEl(
   handlers: BoardHandlers,
   disabled: boolean,
 ): HTMLElement {
-  const el = h("article", { class: "board-card", tabindex: "0", "data-card-key": card.key, "aria-label": card.row ? `${card.key} ${card.row.ticket.summary}` : card.key });
+  const label = card.reading ? `Reading: ${card.reading.title}` : card.row ? `${card.key} ${card.row.ticket.summary}` : card.key;
+  const el = h("article", { class: `board-card${card.reading !== undefined ? " board-card-reading" : ""}`, tabindex: "0", "data-card-key": card.key, "aria-label": label });
   const remove = h("button", {
     type: "button",
     class: "card-x",
     title: "Remove from Kanban",
-    "aria-label": `Remove ${card.key} from Kanban`,
+    "aria-label": `Remove ${card.reading?.title ?? card.key} from Kanban`,
     onclick: () => handlers.onOp({ op: "remove", key: card.key }),
   }, "✕");
   if (disabled) remove.setAttribute("disabled", "");
 
   const row: Row | null = card.row;
-  if (!row) {
+  if (card.reading !== undefined) {
+    // A reading list item: glasses, title and status; it opens the reading panel and has no inline note.
+    const r = card.reading;
+    el.append(
+      h("div", { class: "card-line" },
+        icon("eyeglasses", "card-reading-icon"),
+        h("button", { type: "button", class: "card-title card-reading-title", title: "Open details", onclick: () => handlers.onOpen(card.key) }, r?.title ?? card.key),
+        remove,
+      ),
+      r
+        ? h("div", { class: "card-line card-meta" }, h("span", { class: "pill" }, r.status))
+        : h("div", { class: "text-muted" }, "reading item not found"),
+    );
+  } else if (!row) {
     el.append(
       h("div", { class: "card-line" }, h("button", { type: "button", class: "key card-key", onclick: () => handlers.onOpen(card.key) }, card.key), remove),
       h("div", { class: "text-muted" }, card.missing ? "not found in Jira" : "loading…"),

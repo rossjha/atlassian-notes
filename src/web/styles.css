@@ -293,6 +293,9 @@ body {
   .rd-linked { display: flex; flex-direction: column; gap: 0.3rem; }
   .rd-linked-item { align-items: center; }
   .rd-linked-icon { width: 14px; height: 14px; flex: none; color: var(--muted); }
+  .card-reading-icon { width: 15px; height: 15px; flex: none; color: var(--muted); margin-top: 0.1rem; }
+  .card-reading-title { text-align: left; color: var(--fg); cursor: pointer; background: none; }
+  .card-reading-title:hover { color: var(--accent); }
   /* ⌘K command palette: near the top of the screen so results grow downwards. */
   .palette-dialog { margin: 12vh auto auto; width: min(36rem, 94vw); padding: 0; background: var(--surface); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow); }
   .palette-dialog::backdrop { background: var(--backdrop); }

@@ -22,9 +22,9 @@ import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
 import { applySavedTheme, currentTheme, saveTheme, THEMES } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
 import { initPalette } from "./palette.ts";
-import { clearReadingUrl, renderReading, type ReadingTabState } from "./reading.ts";
+import { clearReadingUrl, focusReadingUrl, renderReading, type ReadingTabState } from "./reading.ts";
 import { configureReadingDrawer, openReadingDrawer, readingDrawerOnLive, readingDrawerSyncStar } from "./readingDrawer.ts";
-import type { ReadingSortKey } from "../shared/reading.ts";
+import { normaliseUrl, readingIdFromCard, type ReadingSortKey } from "../shared/reading.ts";
 import type { PaletteCommand } from "../shared/palette.ts";
 
 // Fallback: public/theme-init.js (a blocking script in <head>) normally applies the saved theme before first paint.
@@ -771,7 +771,11 @@ async function refreshBoard(): Promise<void> {
 }
 
 const boardHandlers: BoardHandlers = {
-  onOpen: (key) => openDrawer(key),
+  onOpen: (key) => {
+    const readingId = readingIdFromCard(key);
+    if (readingId !== null) openReadingDrawer(readingId);
+    else openDrawer(key);
+  },
   onOp: boardOp,
   onNoteSaved: () => void loadBoard(),
   onRefresh: () => void refreshBoard(),
@@ -1049,6 +1053,13 @@ async function addReading(url: string): Promise<void> {
 /** Commands for the ⌘K palette, built from the current state each time it opens or its query changes. */
 function paletteCommands(query: string): PaletteCommand[] {
   const cs: PaletteCommand[] = [];
+  const url = normaliseUrl(query);
+  if (url !== null) {
+    cs.push({ id: "reading-add-url", label: `Add ${url} to reading list`, group: "Reading", run: () => {
+      if (activeId !== READING_TAB) selectTab(READING_TAB);
+      void addReading(url);
+    } });
+  }
   const key = query.trim().toUpperCase();
   if (isValidKeyClient(key)) cs.push({ id: "open-key", label: `Open ${key}`, group: "Ticket", run: () => openDrawer(key, { fromSearch: true }) });
   cs.push({
@@ -1066,6 +1077,7 @@ function paletteCommands(query: string): PaletteCommand[] {
   cs.push(
     { id: "go-kanban", label: "Kanban", group: "Go to", keywords: ["board", "tab"], current: activeId === BOARD_TAB, run: () => selectTab(BOARD_TAB) },
     { id: "go-scratch", label: "Scratchpad", group: "Go to", keywords: ["excalidraw", "draw", "tab"], current: activeId === SCRATCH_TAB, run: () => selectTab(SCRATCH_TAB) },
+    { id: "go-reading", label: "Reading list", group: "Go to", keywords: ["reading", "links", "confluence", "tab"], current: activeId === READING_TAB, run: () => selectTab(READING_TAB) },
     ...views.map((v): PaletteCommand => ({ id: `go-${v.id}`, label: v.name, group: "Go to", keywords: ["view", "tab"], current: v.id === activeId, run: () => selectTab(v.id) })),
     ...navLinks.map((l, i): PaletteCommand => ({
       id: `link-${i}`,
@@ -1098,6 +1110,17 @@ function paletteCommands(query: string): PaletteCommand[] {
   }
   if (activeId === BOARD_TAB) cs.push({ id: "board-refresh", label: "Refresh board", group: "Kanban", keywords: ["reload", "jira"], run: () => void refreshBoard() });
   if (!locked && columns) cs.push({ id: "view-add", label: "Add view…", group: "View", keywords: ["new", "tab"], run: () => editView(null) });
+
+  cs.push(
+    { id: "reading-add", label: "Add a link…", group: "Reading", keywords: ["url", "confluence"], run: () => {
+      if (activeId !== READING_TAB) selectTab(READING_TAB);
+      setTimeout(focusReadingUrl, 0); // after the tab's (possibly view-transitioned) paint
+    } },
+    ...readingConfig.statuses.map((st): PaletteCommand => ({ id: `reading-show-${st}`, label: `Show ${st}`, group: "Reading", keywords: ["status"], run: () => {
+      if (activeId !== READING_TAB) selectTab(READING_TAB);
+      setReadingStatus(st);
+    } })),
+  );
 
   const theme = currentTheme();
   cs.push(...THEMES.map((t): PaletteCommand => ({ id: `theme-${t.id}`, label: t.name, group: "Theme", keywords: ["colour", "color"], current: t.id === theme, run: () => saveTheme(t.id) })));
