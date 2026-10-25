@@ -19,8 +19,10 @@ import type { NavLink } from "../shared/links.ts";
 import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
 import { flushScratchpad, showScratchpad } from "./scratchpad.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
-import { applySavedTheme } from "./themes.ts";
+import { applySavedTheme, currentTheme, saveTheme, THEMES } from "./themes.ts";
 import { tabNavDir, withPageTransition } from "./motion.ts";
+import { initPalette } from "./palette.ts";
+import type { PaletteCommand } from "../shared/palette.ts";
 
 // Fallback: public/theme-init.js (a blocking script in <head>) normally applies the saved theme before first paint.
 applySavedTheme();
@@ -68,7 +70,7 @@ const searchInput = h("input", {
   type: "text",
   class: "ticket-search-input",
   placeholder: "Ticket key…",
-  title: "Open a ticket by key (⌘S)",
+  title: "Open a ticket by key (⌘S). ⌘K for all commands",
   "aria-label": "Open ticket by key",
   autocomplete: "off",
   spellcheck: "false",
@@ -862,6 +864,65 @@ function onLive(e: LiveEvent): void {
       break;
   }
 }
+
+/** Commands for the ⌘K palette, built from the current state each time it opens or its query changes. */
+function paletteCommands(query: string): PaletteCommand[] {
+  const cs: PaletteCommand[] = [];
+  const key = query.trim().toUpperCase();
+  if (isValidKeyClient(key)) cs.push({ id: "open-key", label: `Open ${key}`, group: "Ticket", run: () => openDrawer(key, { fromSearch: true }) });
+  cs.push({
+    id: "find-key",
+    label: "Find ticket by key",
+    group: "Ticket",
+    keywords: ["search", "open"],
+    hint: "⌘S",
+    run: () => {
+      if (currentDrawerKey()) closeDrawer();
+      searchInput.focus();
+    },
+  });
+
+  cs.push(
+    { id: "go-kanban", label: "Kanban", group: "Go to", keywords: ["board", "tab"], current: activeId === BOARD_TAB, run: () => selectTab(BOARD_TAB) },
+    { id: "go-scratch", label: "Scratchpad", group: "Go to", keywords: ["excalidraw", "draw", "tab"], current: activeId === SCRATCH_TAB, run: () => selectTab(SCRATCH_TAB) },
+    ...views.map((v): PaletteCommand => ({ id: `go-${v.id}`, label: v.name, group: "Go to", keywords: ["view", "tab"], current: v.id === activeId, run: () => selectTab(v.id) })),
+    ...navLinks.map((l, i): PaletteCommand => ({
+      id: `link-${i}`,
+      label: l.name,
+      group: "Go to",
+      keywords: ["link"],
+      ...(l.newTab ? { hint: "↗" } : {}),
+      run: () => {
+        if (l.newTab) window.open(l.url, "_blank", "noopener,noreferrer");
+        else void flushScratchpad().then(() => location.assign(l.url));
+      },
+    })),
+  );
+
+  const locked = viewsLocked();
+  const view = activeView();
+  if (view) {
+    cs.push({ id: "view-refresh", label: "Refresh from Jira", group: "View", keywords: ["reload"], run: () => void doRefresh() });
+    if (!locked) {
+      cs.push(
+        { id: "view-jql", label: "Edit JQL", group: "View", keywords: ["query"], run: () => startJqlEdit(view) },
+        { id: "view-edit", label: "Edit view…", group: "View", keywords: ["columns", "settings"], run: () => editView(view) },
+      );
+    }
+    if (jiraBaseUrl) {
+      const url = jiraSearchUrl(jiraBaseUrl, view.jql);
+      cs.push({ id: "view-open-jira", label: "Open JQL in Jira", group: "View", keywords: ["query"], hint: "↗", run: () => window.open(url, "_blank", "noopener,noreferrer") });
+    }
+    if (!locked && views.length > 1) cs.push({ id: "view-delete", label: "Delete view…", group: "View", keywords: ["remove"], run: () => void confirmDeleteView(view) });
+  }
+  if (activeId === BOARD_TAB) cs.push({ id: "board-refresh", label: "Refresh board", group: "Kanban", keywords: ["reload", "jira"], run: () => void refreshBoard() });
+  if (!locked && columns) cs.push({ id: "view-add", label: "Add view…", group: "View", keywords: ["new", "tab"], run: () => editView(null) });
+
+  const theme = currentTheme();
+  cs.push(...THEMES.map((t): PaletteCommand => ({ id: `theme-${t.id}`, label: t.name, group: "Theme", keywords: ["colour", "color"], current: t.id === theme, run: () => saveTheme(t.id) })));
+  return cs;
+}
+initPalette(paletteCommands);
 
 setInterval(() => {
   const el = document.querySelector(".last-refreshed");

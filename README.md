@@ -104,6 +104,10 @@ The **Kanban** tab (far left) is a personal board for tickets you want to come b
 
 > Read my board.yaml and the notes for everything in Doing, then tell me which of them is ready to pick up and what is blocking the rest.
 
+## Command palette
+
+Press **⌘K** (Ctrl+K on Windows/Linux) anywhere, even on the Scratchpad canvas, to open the command palette. Commands are grouped under headings: **Ticket** (type a key such as `pay-412` to open it), **Go to** (Kanban, Scratchpad, your views and top-bar links), **View** (refresh, edit the JQL or view, open the JQL in Jira, add or delete a view), **Kanban** (refresh, on the board) and **Theme**. Type to filter. Words match in any order, and typing a heading such as `theme` lists that group. ↑/↓ choose, Enter runs, Esc or ⌘K closes. ● marks the current tab and theme.
+
 ## Groom file contract
 
 Claude (or any tool) writes `$NOTES_DIR/jira/groom/<KEY>.md`:
