@@ -326,7 +326,7 @@ function groomSection(row: Row | null): HTMLElement {
     if (payload.groom) {
       box.append(
         h("div", { class: "dr-groom-head" },
-          payload.groom.summary.readiness ? h("span", { class: "pill groom-readiness" }, payload.groom.summary.readiness) : null,
+          payload.groom.summary.readiness ? h("span", { class: "pill groom-readiness", title: payload.groom.summary.readiness }, payload.groom.summary.readiness) : null,
           h("code", { class: "text-muted", title: "Groom file" }, payload.groomPath),
         ),
         htmlBox(payload.groomHtml, ""),

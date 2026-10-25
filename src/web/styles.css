@@ -172,6 +172,9 @@ body {
   .groom-box { flex: 1; min-width: 0; background: color-mix(in srgb, var(--chart-3) 8%, transparent); border: 1px solid color-mix(in srgb, var(--chart-3) 35%, transparent); border-radius: var(--r-sm); padding: 0.15rem 0.4rem; }
   .groom-head { display: flex; gap: 0.5rem; align-items: center; font-size: 11px; }
   .groom-readiness { color: var(--chart-3); border-color: color-mix(in srgb, var(--chart-3) 50%, transparent); background: transparent; }
+  /* A readiness that's a sentence ("parked — waiting on …") shrinks with an ellipsis instead of pushing out of the box; the full text is in its title. */
+  .groom-readiness { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .groom-head > .text-muted { flex-shrink: 0; white-space: nowrap; }
   .groom-box .cell-clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stale-dot { flex: none; width: 8px; height: 8px; margin-top: 0.4rem; border-radius: 50%; background: var(--warn); }
   .link-btn { color: var(--muted); background: none; font-size: 12px; cursor: pointer; text-decoration: underline dotted; }

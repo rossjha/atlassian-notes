@@ -67,7 +67,7 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
       const g = row.groom;
       const box = h("div", { class: "groom-box" },
         h("div", { class: "groom-head" },
-          g.readiness ? h("span", { class: "pill groom-readiness" }, g.readiness) : null,
+          g.readiness ? h("span", { class: "pill groom-readiness", title: g.readiness }, g.readiness) : null,
           g.groomedAt ? h("span", { class: "text-muted", title: g.groomedAt }, relativeTime(g.groomedAt)) : null,
         ),
         h("div", { class: setting.display === "expand" ? "cell-wrap" : "cell-clip" }, g.summary),

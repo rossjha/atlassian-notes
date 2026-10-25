@@ -84,7 +84,7 @@ function cardEl(
     const t = row.ticket;
     const lineTwo = h("div", { class: "card-line card-meta" },
       h("span", { class: `pill cat-${t.statusCategory.replace(/\W+/g, "-").toLowerCase()}` }, t.status),
-      row.groom?.readiness ? h("span", { class: "pill groom-readiness" }, row.groom.readiness) : null,
+      row.groom?.readiness ? h("span", { class: "pill groom-readiness", title: row.groom.readiness }, row.groom.readiness) : null,
       row.flags.jiraNewerThanNote ? h("span", { class: "stale-dot card-stale", title: "Jira changed after this note was last edited" }) : null,
     );
     const note = h("div", { class: "card-note" });
