@@ -14,6 +14,7 @@ import { renderTable, type SortState, type TableHandlers } from "./table.ts";
 import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
 import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
 import { moveById } from "../shared/order.ts";
+import { jiraSearchUrl } from "../shared/jiraUrls.ts";
 import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
 import { flushScratchpad, showScratchpad } from "./scratchpad.ts";
 import { openViewEditor, uniqueViewId } from "./viewEditor.ts";
@@ -32,6 +33,7 @@ const isFixedTab = (id: string | null): boolean => id === BOARD_TAB || id === SC
 
 let views: View[] = [];
 let columns: ColumnsConfig | null = null;
+let jiraBaseUrl: string | null = null;
 let configError: string | null = null;
 let activeId: string | null = null;
 let rows: Row[] = [];
@@ -508,7 +510,20 @@ function renderChrome(): void {
         ? h("code", { class: "jql" }, view.jql)
         : h("button", { type: "button", class: "jql jql-btn", title: "Click to edit JQL (Enter saves, Esc cancels)", onclick: () => startJqlEdit(view) }, view.jql);
     headerEl.append(
-      h("div", { class: "jql-field" }, icon("jira", "jql-icon brand-jira"), jql),
+      h("div", { class: "jql-field" },
+        icon("jira", "jql-icon brand-jira"),
+        jql,
+        jiraBaseUrl && !jqlEditor
+          ? h("a", {
+              class: "jql-open",
+              href: jiraSearchUrl(jiraBaseUrl, view.jql),
+              target: "_blank",
+              rel: "noopener noreferrer",
+              title: "Open this query in Jira",
+              "aria-label": "Open this query in Jira",
+            }, icon("arrowTopRightOnSquare", "jql-open-svg"))
+          : null,
+      ),
       h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(fetchedAt)}`),
       refresh,
     );
@@ -725,6 +740,7 @@ async function loadConfig(): Promise<void> {
     const cfg = await api.config();
     if (pendingViewSaves === 0) views = cfg.views; // else a queued save holds newer views; its own live event reloads
     columns = cfg.columns;
+    jiraBaseUrl = cfg.jiraBaseUrl;
     configError = cfg.error;
   } catch (e) {
     configError = (e as Error).message;

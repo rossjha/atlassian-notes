@@ -108,6 +108,11 @@ body {
   .jql-field { position: relative; display: flex; flex: 1; min-width: 0; }
   .jql-icon { position: absolute; left: 0.5rem; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; pointer-events: none; z-index: 1; }
   .jql-field > .jql { flex: 1; padding-left: 1.75rem; }
+  /* "Open in Jira" sits inside the bar's right end; the bar keeps room for it so the JQL ellipsises before it. */
+  .jql-field:has(.jql-open) > .jql { padding-right: 1.75rem; }
+  .jql-open { position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%); display: inline-flex; padding: 0.15rem; border-radius: var(--r-sm); color: var(--muted); z-index: 1; }
+  .jql-open:hover, .jql-open:focus-visible { color: var(--accent); }
+  .jql-open-svg { width: 13px; height: 13px; }
   .btn { padding: 0.2rem 0.7rem; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--fg); cursor: pointer; }
   .btn:hover:not(:disabled) { border-color: var(--accent); }
   .btn:disabled { opacity: 0.6; cursor: default; }
