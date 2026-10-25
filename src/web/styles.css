@@ -160,6 +160,10 @@ body {
   .cat-done { color: var(--success); border-color: color-mix(in srgb, var(--success) 50%, transparent); background: color-mix(in srgb, var(--success) 10%, transparent); }
   .cat-indeterminate, .cat-in-progress { color: var(--chart-2); border-color: color-mix(in srgb, var(--chart-2) 50%, transparent); background: color-mix(in srgb, var(--chart-2) 10%, transparent); }
   .labels { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+  /* Table pills (status, labels, components, select options) stop at the same cap as text cells and ellipsise;
+     the full value is in the title, and widening the column shows more (see .col-sized below). */
+  .ticket-grid td .pill { max-width: 30ch; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+  .ticket-grid td .labels { max-width: 100%; }
 
   .cell-flex { display: flex; align-items: flex-start; gap: 0.4rem; }
   .note-box { flex: 1; min-width: 0; border: 1px dashed var(--dim); border-radius: var(--r-sm); padding: 0.15rem 0.4rem; min-height: 1.6em; color: var(--fg); }

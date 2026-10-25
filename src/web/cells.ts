@@ -42,13 +42,13 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
       return plain(t.summary, "cell-summary");
     }
     case "status":
-      return h("span", { class: `pill cat-${t.statusCategory.replace(/\W+/g, "-").toLowerCase()}` }, t.status);
+      return h("span", { class: `pill cat-${t.statusCategory.replace(/\W+/g, "-").toLowerCase()}`, title: t.status }, t.status);
     case "parent":
       return plain(t.parent ? `${t.parent.key} ${t.parent.summary}` : null, "text-muted");
     case "labels":
-      return h("span", { class: "labels" }, ...t.labels.map((l) => h("span", { class: "pill" }, l)));
+      return h("span", { class: "labels" }, ...t.labels.map((l) => h("span", { class: "pill", title: l }, l)));
     case "components":
-      return h("span", { class: "labels" }, ...(t.components ?? []).map((c) => h("span", { class: "pill" }, c)));
+      return h("span", { class: "labels" }, ...(t.components ?? []).map((c) => h("span", { class: "pill", title: c }, c)));
     case "updated":
       return h("span", { class: "cell-text text-muted", title: t.updated }, relativeTime(t.updated));
     case "note": {
@@ -87,7 +87,7 @@ export function renderCell(row: Row, setting: ColumnSetting, columns: ColumnsCon
       if (def && def.type === "select") {
         const v = row.custom[setting.id];
         if (!v) return plain(null);
-        const pill = h("span", { class: "pill" }, v);
+        const pill = h("span", { class: "pill", title: v }, v);
         const color = def.options[v];
         if (color) {
           pill.style.setProperty("--pill-color", color);
