@@ -214,3 +214,16 @@ test("loadReadingConfig: doneStatus defaults to the last status; categories and 
   assert.deepEqual(cfg.prompts, []);
   assert.equal(cfg.groomPrompt, DEFAULT_READING_CONFIG.groomPrompt);
 });
+
+test("a view's keyword search round-trips; blank or non-string is dropped", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  await ensureDataDir(dir, "PAY", examples);
+  const columns = await loadColumns(dir);
+  const base = { name: "V", jql: "project = PAY", limit: 50, columns: [], filters: {} };
+  await saveViews(dir, [{ id: "a", ...base, search: "auth" }]);
+  assert.equal((await loadViews(dir, columns))[0]!.search, "auth");
+  await fs.writeFile(path.join(dir, "views.yaml"), "views:\n  - {id: a, name: V, jql: x, search: '  '}\n  - {id: b, name: V, jql: x, search: 3}\n");
+  const loaded = await loadViews(dir, columns);
+  assert.equal("search" in loaded[0]!, false);
+  assert.equal("search" in loaded[1]!, false);
+});

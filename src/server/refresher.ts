@@ -1,3 +1,4 @@
+import { withKeyword } from "../shared/search.ts";
 import type { LiveEvent, Ticket, View } from "../shared/types.ts";
 import type { CachedView, ViewCache } from "./cache.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
@@ -41,7 +42,7 @@ export class Refresher {
     const { jira, cache, notes, onChange } = this.deps;
     let result: CachedView;
     try {
-      const tickets = await jira.search(view.jql, view.limit);
+      const tickets = await jira.search(withKeyword(view.jql, view.search), view.limit);
       result = { fetchedAt: this.now().toISOString(), tickets, error: null };
       await cache.write(view.id, result);
       await this.ensureIdentities(tickets);

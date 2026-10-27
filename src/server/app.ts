@@ -361,7 +361,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
         error = err.message;
       }
       const { links, error: linksError } = await loadLinks(config.notesDir);
-      return send(res, 200, { views, columns, jiraBaseUrl: config.jiraBaseUrl, error, links, linksError });
+      return send(res, 200, { views, columns, jiraBaseUrl: config.jiraBaseUrl, defaultProject: config.defaultProject, error, links, linksError });
     }
     if (method === "PUT" && a === "views" && segs.length === 1) {
       const body = await readJson(req);

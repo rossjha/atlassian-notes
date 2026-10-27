@@ -64,6 +64,8 @@ export interface View {
   limit: number;
   columns: ColumnSetting[];
   filters: Filters;
+  /** Keyword search from the box beside the JQL bar; refreshes add `AND text ~ "<search>"` (see shared/search.ts). */
+  search?: string;
 }
 
 export type CustomColumnDef =

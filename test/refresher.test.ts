@@ -218,3 +218,14 @@ test("refresher calls onTicketRenamed for each reconcile rename", async () => {
   await r.refreshAll();
   assert.deepEqual(renamed, [["OLD-1", "NEW-1"]]);
 });
+
+test("refreshView searches with the view's keyword ANDed in", async () => {
+  const seen: string[] = [];
+  const { r } = setup(async (jql) => {
+    seen.push(jql);
+    return [];
+  });
+  await r.refreshView({ ...view, jql: "project = PAY ORDER BY rank", search: "auth" });
+  await r.refreshView(view);
+  assert.deepEqual(seen, ['(project = PAY) AND text ~ "auth" ORDER BY rank', "project = PAY"]);
+});

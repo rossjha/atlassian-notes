@@ -5,6 +5,8 @@ export interface ConfigResponse {
   views: View[];
   columns: ColumnsConfig;
   jiraBaseUrl: string;
+  /** JIRA_PROJECT from setup: a bare number in the ticket search opens a ticket in this project. */
+  defaultProject: string;
   error: string | null;
   links: NavLink[];
   /** links.yaml problems (bad entries are skipped; the rest still show). */

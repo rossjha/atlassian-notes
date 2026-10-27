@@ -1,7 +1,7 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, ReadingConfig, ReadingItem, Row, View } from "../shared/types.ts";
 import { icon, linkIcon, refreshButton } from "./icons.ts";
 import { confirmDialog, themePickerButton, viewSettingsButton } from "./viewMenu.ts";
-import { applyFilters, isValidKeyClient, sortRows } from "../shared/rowOps.ts";
+import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
 import { applyOpLocal, shouldAutoMove } from "../shared/boardOps.ts";
 import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board.ts";
@@ -15,6 +15,7 @@ import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
 import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
 import { moveById } from "../shared/order.ts";
 import { jiraSearchUrl } from "../shared/jiraUrls.ts";
+import { keywordClause, splitOrderBy, ticketKeyFromInput, withKeyword } from "../shared/search.ts";
 import type { NavLink } from "../shared/links.ts";
 import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
 import { flushScratchpad, showScratchpad } from "./scratchpad.ts";
@@ -42,6 +43,7 @@ const READING_STATUS_KEY = "atlassian-notes.readingStatus";
 let views: View[] = [];
 let columns: ColumnsConfig | null = null;
 let jiraBaseUrl: string | null = null;
+let defaultProject: string | null = null;
 let navLinks: NavLink[] = [];
 let linksError: string | null = null;
 let configError: string | null = null;
@@ -51,6 +53,64 @@ let fetchedAt: string | null = null;
 let rowsError: string | null = null;
 let saveError: string | null = null;
 let rowsLoaded = false;
+// Keyword search beside the JQL bar: one input kept across renderChrome() so typing and focus survive re-renders.
+const keywordInput = h("input", {
+  type: "text",
+  class: "keyword-input",
+  placeholder: "Search this view…",
+  title: "Adds AND text ~ \"…\" to this tab's query (Enter searches, Esc or × clears)",
+  "aria-label": "Search this view by keyword",
+  autocomplete: "off",
+  spellcheck: "false",
+}) as HTMLInputElement;
+const keywordClear = h("button", { type: "button", class: "keyword-clear", title: "Clear the search", "aria-label": "Clear the search" }, icon("xMark", "keyword-clear-svg"));
+const keywordField = h("form", { class: "keyword-field", role: "search" }, icon("magnifyingGlass", "keyword-icon"), keywordInput, keywordClear);
+let keywordViewId: string | null = null;
+const syncKeywordClear = (): void => {
+  keywordClear.hidden = keywordInput.value === "";
+};
+keywordInput.addEventListener("input", syncKeywordClear);
+keywordField.addEventListener("submit", (e) => {
+  e.preventDefault();
+  void commitKeyword(keywordInput.value);
+});
+keywordInput.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  e.preventDefault();
+  keywordInput.value = "";
+  syncKeywordClear();
+  void commitKeyword("");
+});
+keywordClear.addEventListener("click", () => {
+  keywordInput.value = "";
+  syncKeywordClear();
+  keywordInput.focus();
+  void commitKeyword("");
+});
+
+/** Saves the active view's keyword search to views.yaml (blank removes it) and refreshes the view with it. */
+async function commitKeyword(value: string): Promise<void> {
+  const view = activeView();
+  if (!view || viewsLocked()) return;
+  const search = value.trim();
+  if (search === (view.search ?? "")) return;
+  const id = view.id;
+  const apply = (v: View): View => {
+    const { search: _old, ...rest } = v;
+    return search ? { ...rest, search } : rest;
+  };
+  try {
+    await saveViewsInOrder((vs) => vs.map((v) => (v.id === id ? apply(v) : v)));
+    saveError = null;
+  } catch (e) {
+    saveError = (e as Error).message;
+    renderChrome();
+    return;
+  }
+  renderChrome();
+  if (activeId === id) void doRefresh();
+}
+
 // Inline JQL editor in the view header; kept across renderChrome() so typing survives re-renders.
 let jqlEditor: { viewId: string; el: HTMLTextAreaElement } | null = null;
 let boardKeys = new Set<string>();
@@ -95,9 +155,9 @@ searchHint.hidden = true;
 const searchInput = h("input", {
   type: "text",
   class: "ticket-search-input",
-  placeholder: "Ticket key…",
-  title: "Open a ticket by key (⌘S). ⌘K for all commands",
-  "aria-label": "Open ticket by key",
+  placeholder: "Key, number or link…",
+  title: "Open a ticket by key, number or Jira link (⌘S). ⌘K for all commands",
+  "aria-label": "Open ticket by key, number or Jira link",
   autocomplete: "off",
   spellcheck: "false",
 }) as HTMLInputElement;
@@ -123,10 +183,10 @@ searchInput.addEventListener("keydown", (e) => {
 });
 searchForm.addEventListener("submit", (e) => {
   e.preventDefault();
-  const key = searchInput.value.trim().toUpperCase();
-  if (key === "") return;
-  if (!isValidKeyClient(key)) {
-    searchHint.textContent = "Enter a key like ABC-123";
+  if (searchInput.value.trim() === "") return;
+  const key = ticketKeyFromInput(searchInput.value, defaultProject);
+  if (key === null) {
+    searchHint.textContent = "Try ABC-123, 123 or a Jira link";
     searchHint.hidden = false;
     return;
   }
@@ -320,7 +380,9 @@ async function saveEditedView(edited: View, isNew: boolean): Promise<void> {
     if (!old) throw new Error("This view no longer exists (it was changed on disk). Close the dialog and reopen it.");
     saved.filters = old.filters; // keep filters changed since the dialog opened
   }
-  await saveViewsInOrder((vs) => (isNew ? [...vs, saved] : vs.map((v) => (v.id === id ? { ...saved, filters: v.filters } : v)))); // keep filters changed meanwhile
+  // Keep filters changed meanwhile, and the keyword search (the dialog doesn't edit it).
+  const keep = (v: View): View => (v.search ? { ...saved, filters: v.filters, search: v.search } : { ...saved, filters: v.filters });
+  await saveViewsInOrder((vs) => (isNew ? [...vs, saved] : vs.map((v) => (v.id === id ? keep(v) : v))));
   const needsRefresh = isNew || old?.jql !== saved.jql || old?.limit !== saved.limit;
   if (isNew) selectTab(id);
   else {
@@ -596,6 +658,16 @@ function renderChrome(): void {
       : locked
         ? h("code", { class: "jql" }, view.jql)
         : h("button", { type: "button", class: "jql jql-btn", title: "Click to edit JQL (Enter saves, Esc cancels)", onclick: () => startJqlEdit(view) }, view.jql);
+    if (view.search && !jqlEditor) {
+      // Show the keyword clause where it's sent: after the filter, before any ORDER BY.
+      const { where, orderBy } = splitOrderBy(view.jql);
+      jql.replaceChildren(where, h("span", { class: "jql-keyword" }, `${where ? " AND " : ""}${keywordClause(view.search)}`), orderBy ? ` ${orderBy}` : "");
+    }
+    // Show the view's saved keyword unless the person is typing in the box for this same view.
+    if (keywordViewId !== view.id || document.activeElement !== keywordInput) keywordInput.value = view.search ?? "";
+    keywordViewId = view.id;
+    keywordInput.disabled = locked;
+    syncKeywordClear();
     headerEl.append(
       h("div", { class: "jql-field" },
         icon("jira", "jql-icon brand-jira"),
@@ -603,7 +675,7 @@ function renderChrome(): void {
         jiraBaseUrl && !jqlEditor
           ? h("a", {
               class: "jql-open",
-              href: jiraSearchUrl(jiraBaseUrl, view.jql),
+              href: jiraSearchUrl(jiraBaseUrl, withKeyword(view.jql, view.search)),
               target: "_blank",
               rel: "noopener noreferrer",
               title: "Open this query in Jira",
@@ -611,6 +683,7 @@ function renderChrome(): void {
             }, icon("arrowTopRightOnSquare", "jql-open-svg"))
           : null,
       ),
+      keywordField,
       h("span", { class: "text-muted last-refreshed" }, `Last refreshed ${relativeTime(fetchedAt)}`),
       refresh,
     );
@@ -845,6 +918,7 @@ async function loadConfig(): Promise<void> {
     if (pendingViewSaves === 0) views = cfg.views; // else a queued save holds newer views; its own live event reloads
     columns = cfg.columns;
     jiraBaseUrl = cfg.jiraBaseUrl;
+    defaultProject = cfg.defaultProject ?? null;
     navLinks = cfg.links ?? [];
     linksError = cfg.linksError ?? null;
     configError = cfg.error;
@@ -1060,8 +1134,8 @@ function paletteCommands(query: string): PaletteCommand[] {
       void addReading(url);
     } });
   }
-  const key = query.trim().toUpperCase();
-  if (isValidKeyClient(key)) cs.push({ id: "open-key", label: `Open ${key}`, group: "Ticket", run: () => openDrawer(key, { fromSearch: true }) });
+  const key = ticketKeyFromInput(query, defaultProject);
+  if (key !== null) cs.push({ id: "open-key", label: `Open ${key}`, group: "Ticket", run: () => openDrawer(key, { fromSearch: true }) });
   cs.push({
     id: "find-key",
     label: "Find ticket by key",

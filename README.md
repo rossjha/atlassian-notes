@@ -55,7 +55,7 @@ Open your notes folder (`NOTES_DIR`, default `~/atlassian-notes-data`) as an Obs
 
 ## views.yaml and columns.yaml
 
-`views.yaml`: each view has an `id`, `name`, `jql`, ordered `columns` (each `id`, optionally `display: truncate`) and optionally `limit` (default 500). See `examples/views.example.yaml`. Built-in column ids: `key`, `summary`, `status`, `type`, `priority`, `assignee`, `reporter`, `storyPoints`, `parent`, `labels`, `components`, `sprint`, `updated`, plus `note` and `groom`, and the sortable timestamps `noteUpdated` ("Note updated") and `groomed` ("Groomed"). These built-in ids (including `noteUpdated` and `groomed`) are reserved: a custom column in `columns.yaml` can't use any of them, and `columns.yaml` is reported as broken if one does.
+`views.yaml`: each view has an `id`, `name`, `jql`, ordered `columns` (each `id`, optionally `display: truncate`) and optionally `limit` (default 500) and `search`, the keyword from the search box beside the JQL bar. Refreshes add `AND text ~ "<search>"` to the query, before any `ORDER BY`; the bar shows the added part in colour, and × or Esc in the box clears it. Your `jql` itself is never changed. See `examples/views.example.yaml`. Built-in column ids: `key`, `summary`, `status`, `type`, `priority`, `assignee`, `reporter`, `storyPoints`, `parent`, `labels`, `components`, `sprint`, `updated`, plus `note` and `groom`, and the sortable timestamps `noteUpdated` ("Note updated") and `groomed` ("Groomed"). These built-in ids (including `noteUpdated` and `groomed`) are reserved: a custom column in `columns.yaml` can't use any of them, and `columns.yaml` is reported as broken if one does.
 
 `columns.yaml`: see `examples/columns.example.yaml`.
 
@@ -97,7 +97,7 @@ The **Kanban** tab (far left) is a personal board for tickets you want to come b
   ```
 
   A card under an unknown column goes to the first column, and a repeated key is kept once. If `board.yaml` can't be parsed, the board shows the error and its controls (and the table stars) are disabled until you fix the file; the app never rewrites a file it couldn't read.
-- **Ticket search:** type a key (any case, e.g. `pay-412`) into the box at the right of the tabs and press Enter to open that ticket's panel, whether or not it is in a view. Esc clears the box. The panel has its own ★ that adds the ticket to the first column or removes it. If the ticket isn't already on your board, saving a non-empty note in a panel opened this way moves it to the `noteColumn` (default Doing). Tickets already on the board are never moved by a note, and notes written from the table views don't touch the board.
+- **Ticket search:** type a key (any case, e.g. `pay-412`), just the number (`412`, in your default project) or paste a Jira link (`…/browse/PAY-412`, or a board link with `?selectedIssue=PAY-412`) into the box at the right of the tabs (⌘S) and press Enter to open that ticket's panel, whether or not it is in a view. Esc clears the box. The panel has its own ★ that adds the ticket to the first column or removes it. If the ticket isn't already on your board, saving a non-empty note in a panel opened this way moves it to the `noteColumn` (default Doing). Tickets already on the board are never moved by a note, and notes written from the table views don't touch the board.
 - **Archive:** the `archiveColumn` lane has an **Archive all** button (click it, then click "Archive N cards?" within 4 seconds). It only takes those cards off the board, like un-starring them. Your notes are kept.
 - **Refresh:** the board fetches its tickets from Jira by key, independently of your JQL views. A ticket Jira can't find (deleted, or no permission) shows as "not found in Jira" and the rest of the board still loads.
 
@@ -139,7 +139,7 @@ In Obsidian, items link to their tickets through the `links` field (kept in step
 
 ## Command palette
 
-Press **⌘K** (Ctrl+K on Windows/Linux) anywhere, even on the Scratchpad canvas, to open the command palette. Commands are grouped under headings: **Ticket** (type a key such as `pay-412` to open it), **Go to** (Kanban, Scratchpad, Reading list, your views and top-bar links), **View** (refresh, edit the JQL or view, open the JQL in Jira, add or delete a view), **Kanban** (refresh, on the board), **Reading** (add a link, show a status; paste a URL to get "Add … to reading list") and **Theme**. Type to filter. Words match in any order, and typing a heading such as `theme` lists that group. ↑/↓ choose, Enter runs, Esc or ⌘K closes. ● marks the current tab and theme.
+Press **⌘K** (Ctrl+K on Windows/Linux) anywhere, even on the Scratchpad canvas, to open the command palette. Commands are grouped under headings: **Ticket** (type a key such as `pay-412`, a number or a Jira link to open it), **Go to** (Kanban, Scratchpad, Reading list, your views and top-bar links), **View** (refresh, edit the JQL or view, open the JQL in Jira, add or delete a view), **Kanban** (refresh, on the board), **Reading** (add a link, show a status; paste a URL to get "Add … to reading list") and **Theme**. Type to filter. Words match in any order, and typing a heading such as `theme` lists that group. ↑/↓ choose, Enter runs, Esc or ⌘K closes. ● marks the current tab and theme.
 
 ## Groom file contract
 

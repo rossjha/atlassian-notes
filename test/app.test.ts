@@ -52,7 +52,7 @@ before(async () => {
   fs.mkdirSync(publicDir);
   fs.writeFileSync(path.join(publicDir, "index.html"), "<h1>hi</h1>");
   fs.writeFileSync(path.join(dir, "secret.txt"), "secret");
-  const config = { jiraBaseUrl: "https://acme.example", notesDir: dir } as Config;
+  const config = { jiraBaseUrl: "https://acme.example", defaultProject: "PAY", notesDir: dir } as Config;
   const notes = new NotesStore(dir);
   const cache = new ViewCache(dir);
   let broadcast: (e: LiveEvent) => void = () => {};
@@ -102,6 +102,7 @@ test("GET /api/config returns the 3 example views, columns and jira url", async 
   assert.deepEqual(body.views.map((v: { id: string }) => v.id), ["current", "next", "backlog"]);
   assert.equal(body.error, null);
   assert.equal(body.jiraBaseUrl, "https://acme.example");
+  assert.equal(body.defaultProject, "PAY");
   assert.ok(body.columns.custom.category);
   assert.equal(res.headers.get("cache-control"), "no-store");
   assert.deepEqual(body.links, []); // no links.yaml yet

@@ -212,7 +212,9 @@ export function validateViews(
       }
       filters[col] = parseFilter(file, col, fv);
     }
-    return { id, name, jql, limit, columns: cols, filters };
+    const view: View = { id, name, jql, limit, columns: cols, filters };
+    if (typeof rv.search === "string" && rv.search.trim() !== "") view.search = rv.search.trim();
+    return view;
   });
 }
 

@@ -208,6 +208,17 @@ export function toast(text: string): void {
   toastTimer = setTimeout(() => el.remove(), 1500);
 }
 
+/** An icon button that copies `text` (e.g. a link) and confirms with a toast; `what` names it for the tooltip. */
+export function copyTextButton(text: string, what: string): HTMLElement {
+  return h("button", {
+    type: "button",
+    class: "btn btn-icon copy-text-btn",
+    title: `Copy ${what}`,
+    "aria-label": `Copy ${what}`,
+    onclick: async () => toast((await copyToClipboard(async () => text)) ? "Copied" : "Copy failed"),
+  }, icon("square2Stack", "btn-svg"));
+}
+
 function copyMenu(key: string): HTMLElement {
   const copy = (kind: CopyKind) => async () => toast((await copyToClipboard(() => api.copy(key, kind))) ? "Copied" : "Copy failed");
   return menuButton({
@@ -373,6 +384,7 @@ function render(): void {
     h("div", { class: "dr-actions" },
       copyMenu(key),
       t ? h("a", { class: "btn btn-icon", href: t.url, target: "_blank", rel: "noopener", title: "Open in Jira" }, "Open", icon("arrowTopRightOnSquare", "btn-svg")) : null,
+      t ? copyTextButton(t.url, "the Jira link") : null,
     ),
   );
 

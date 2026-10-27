@@ -4,7 +4,7 @@ import { readingCardKey } from "../shared/reading.ts";
 import type { ReadingConfig, ReadingItem } from "../shared/types.ts";
 import { api, type ReadingCopyKind, type ReadingItemResponse, type ReadingPatch } from "./api.ts";
 import { copyToClipboard, h, relativeTime, setHtml } from "./dom.ts";
-import { closeDrawer, toast, type DrawerHooks } from "./drawer.ts";
+import { closeDrawer, copyTextButton, toast, type DrawerHooks } from "./drawer.ts";
 import { editMarkdown, isEditing } from "./editors.ts";
 import { icon } from "./icons.ts";
 import { motionAllowed, motionMs } from "./motion.ts";
@@ -403,7 +403,10 @@ function render(): void {
       ...field("Category", selectField("Category", it.category, cfg.categories, true, locked, (v) => void saveFields({ category: v }))),
       ...field("Tickets", ticketsField(it, locked)),
       ...field("Source", it.source),
-      ...field("URL", inlineText(it.url, "URL", h("span", { class: "rd-url" }, it.url), locked, (v) => void saveFields({ url: v }))),
+      ...field("URL", h("span", { class: "rd-url-row" },
+        inlineText(it.url, "URL", h("span", { class: "rd-url" }, it.url), locked, (v) => void saveFields({ url: v })),
+        it.url ? copyTextButton(it.url, "the link") : null,
+      )),
       ...field("Added", h("span", { title: it.created }, relativeTime(it.created))),
       ...field("Updated", h("span", { title: it.updated }, relativeTime(it.updated))),
     )));
