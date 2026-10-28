@@ -78,8 +78,9 @@ export interface ColumnsConfig {
   groomPrompt: string;
 }
 
-export interface TicketLink { type: string; direction: "inward" | "outward"; key: string }
-export interface TicketSprint { name: string; state: string }
+/** `done`: the linked ticket's status category is done (absent in caches written before it was fetched). */
+export interface TicketLink { type: string; direction: "inward" | "outward"; key: string; done?: boolean }
+export interface TicketSprint { name: string; state: string; startDate?: string; endDate?: string }
 
 export interface Ticket {
   id: string;
@@ -100,6 +101,12 @@ export interface Ticket {
   components?: string[];
   sprints?: TicketSprint[];
   links?: TicketLink[];
+  /** Jira's status category key; older caches only have the display name in statusCategory. */
+  statusCategoryKey?: "new" | "indeterminate" | "done";
+  /** Values of analysis.yaml's extra fields (settings.fields), by field id. */
+  extra?: Record<string, string | null>;
+  /** Jira's Flagged field (analysis.yaml blocked.flagField) has a value. */
+  flagged?: boolean;
   updated: string;
 }
 
