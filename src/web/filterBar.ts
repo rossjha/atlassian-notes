@@ -37,8 +37,9 @@ export function renderFilterBar(
   columns: ColumnsConfig,
   totals: { shown: number; total: number; loaded?: boolean },
   onChange: (filters: Filters) => void,
+  drill?: { label: string; onClear: () => void },
 ): void {
-  const draw = (): void => renderFilterBar(container, view, columns, totals, onChange);
+  const draw = (): void => renderFilterBar(container, view, columns, totals, onChange, drill);
   rerender = draw;
   const custom = Object.entries(columns.custom);
   const activeEntries = Object.entries(view.filters).filter(([id, f]) => columns.custom[id] && isActive(f));
@@ -131,7 +132,14 @@ export function renderFilterBar(
   } }, "Clear filters");
   clear.hidden = Object.keys(view.filters).length === 0;
 
+  // A drill-down from the Analysis side: temporary, never saved, applied before the filter chips.
+  const drillChip = drill
+    ? h("span", { class: "fb-drill", title: "From Analysis; not saved" }, `From analysis · ${drill.label}`,
+        h("button", { type: "button", "aria-label": "Clear the analysis drill-down", onclick: drill.onClear }, "×"))
+    : null;
+
   container.replaceChildren(
+    ...(drillChip ? [drillChip] : []),
     adder,
     ...chips,
     clear,

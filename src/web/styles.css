@@ -528,3 +528,73 @@ nav.tabs { view-transition-name: an-tabs; }
   :root:not([data-motion="off"]) .reading-new { animation: reading-new 1.6s var(--motion-ease) both; }
   :root:not([data-motion="off"]) .dr-toast { animation: forge-toast-in var(--motion-enter) var(--motion-ease) both; }
 }
+
+@layer components {
+  /* View analysis (src/web/analysis.ts). Colours come from the theme's chart tokens through --c. */
+  .view-mode { display: inline-flex; flex: none; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+  .view-mode button { padding: 0 0.6rem; height: 22px; font-size: 12px; color: var(--muted); background: none; cursor: pointer; }
+  .view-mode button:hover { color: var(--fg); }
+  .view-mode button[aria-pressed="true"] { color: var(--fg); background: var(--surface-2); box-shadow: inset 0 -2px 0 var(--accent); }
+  .fb-drill { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0 0.25rem 0 0.5rem; font-size: 12px; border: 1px solid var(--accent); border-radius: var(--r-sm); color: var(--fg); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .fb-drill button { display: inline-flex; padding: 0.1rem; color: var(--muted); background: none; cursor: pointer; }
+  .fb-drill button:hover { color: var(--accent); }
+
+  .an-c1 { --c: var(--chart-1); } .an-c2 { --c: var(--chart-2); } .an-c3 { --c: var(--chart-3); } .an-c4 { --c: var(--chart-4); } .an-c5 { --c: var(--chart-5); }
+  .an-cother, .an-todo { --c: var(--dim); } .an-done { --c: var(--success); } .an-ip { --c: var(--chart-2); }
+  .an-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0.75rem; padding: 0.25rem 0 1rem; }
+  .an-card { border: 1px solid var(--border); background: var(--surface); border-radius: var(--r-sm); padding: 0.75rem; min-width: 0; }
+  .an-s3 { grid-column: span 3; } .an-s4 { grid-column: span 4; } .an-s6 { grid-column: span 6; } .an-s12 { grid-column: span 12; }
+  /* A half-width card after the Complete ring fills the rest of its row (as in the mock). */
+  .an-s4 + .an-s6 { grid-column: span 8; }
+  @media (max-width: 900px) { .an-s3 { grid-column: span 6; } .an-s4, .an-s6, .an-s4 + .an-s6 { grid-column: span 12; } }
+  @media (max-width: 560px) { .an-s3 { grid-column: span 12; } }
+  .an-title { display: flex; justify-content: space-between; gap: 0.5rem; margin: 0 0 0.6rem; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .an-title em { font-style: normal; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--dim); }
+  .an-kpi { display: block; font-size: 22px; font-weight: 600; line-height: 1.2; color: var(--fg); text-align: left; background: none; }
+  .an-kpi small { font-size: 11px; font-weight: 400; color: var(--muted); }
+  .an-click { cursor: pointer; }
+  button.an-kpi:hover .an-count, button.an-kpi:focus-visible .an-count { text-decoration: underline dotted; }
+  .an-flag { color: var(--warn); } .an-low { color: var(--chart-2); } .an-muted { color: var(--muted); }
+  .an-note { margin-top: 0.5rem; font-size: 11px; color: var(--muted); }
+  .an-stack { display: flex; gap: 2px; height: 12px; min-width: 0; }
+  .an-stack i, .an-bar i, .an-legend b, .an-donut-legend b { display: block; background: var(--c); }
+  .an-track { background: var(--surface-2); }
+  .an-legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.5rem; font-size: 11px; color: var(--muted); }
+  .an-legend b, .an-donut-legend b { display: inline-block; width: 8px; height: 8px; margin-right: 0.35rem; }
+  .an-bars { display: grid; grid-template-columns: minmax(5rem, max-content) 1fr auto; gap: 0.35rem 0.6rem; align-items: center; }
+  .an-bar { position: relative; height: 10px; background: var(--surface-2); }
+  .an-bar i { position: absolute; inset: 0 auto 0 0; }
+  .an-n { color: var(--muted); font-size: 11px; text-align: right; white-space: nowrap; }
+  .an-label { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 12px; color: var(--fg); background: none; }
+  .an-label.an-muted { color: var(--muted); } .an-label.an-low { color: var(--chart-2); }
+  .an-label:hover, .an-label:focus-visible { color: var(--accent); }
+  .an-rows { display: grid; gap: 0.45rem; }
+  .an-row { display: grid; grid-template-columns: minmax(5rem, 9rem) 1fr auto; gap: 0.6rem; align-items: center; }
+  .an-donut-wrap { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  .an-donut, .an-ring { width: 104px; height: 104px; flex: none; }
+  .an-seg { stroke: var(--c); cursor: pointer; transition: opacity var(--motion-hover); }
+  .an-donut:has(.an-seg:hover) .an-seg:not(:hover) { opacity: 0.35; }
+  .an-donut-total, .an-ring-text { fill: var(--fg); font: 600 6px var(--font); }
+  .an-donut-legend { display: grid; gap: 0.3rem; min-width: 0; }
+  .an-legend-row { display: flex; align-items: center; gap: 0.1rem; font-size: 12px; color: var(--fg); background: none; text-align: left; }
+  .an-legend-row .an-n { margin-left: 0.35rem; }
+  .an-legend-row:hover, .an-legend-row:focus-visible { color: var(--accent); }
+  .an-ring-track { fill: none; stroke: var(--surface-2); stroke-width: 5; }
+  .an-ring-fill { fill: none; stroke: var(--c); stroke-width: 5; }
+  .an-ring-btn { background: none; padding: 0; }
+  .an-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .an-table th { text-align: left; font-weight: 400; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 0.4rem 0.3rem; }
+  .an-table td { padding: 0.3rem 0.4rem; border-top: 1px solid var(--border); white-space: nowrap; }
+  .an-table td.an-summary { white-space: normal; max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
+  .an-click-row { cursor: pointer; }
+  .an-click-row:hover td, .an-click-row:focus-visible td { background: var(--surface-2); }
+  .an-countdown { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem; }
+  .an-days-wrap { flex: 1; min-width: 16rem; }
+  .an-days { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; }
+  .an-day { display: block; height: 16px; background: var(--surface-2); }
+  .an-day-past { background: var(--success); }
+  .an-day-today { background: var(--accent); }
+  .an-day-freeze { box-shadow: inset 0 0 0 1px var(--warn); }
+  .an-days-labels { margin-top: 3px; font-size: 10px; color: var(--muted); }
+  .an-today-label { color: var(--accent); }
+}

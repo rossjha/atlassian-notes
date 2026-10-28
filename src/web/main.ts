@@ -8,6 +8,7 @@ import { isDragging, onDragIdle, renderBoard, type BoardHandlers } from "./board
 import { h, relativeTime } from "./dom.ts";
 import { configureDrawer, drawerOnLive, drawerSyncStar, openDrawer, closeDrawer, currentDrawerKey, toast } from "./drawer.ts";
 import { isEditing, onEditorsIdle } from "./editors.ts";
+import { renderAnalysis } from "./analysis.ts";
 import { renderFilterBar } from "./filterBar.ts";
 import { connectLive } from "./live.ts";
 import { renderTable, type SortState, type TableHandlers } from "./table.ts";
@@ -15,6 +16,7 @@ import { isColumnDragging, onColumnDragIdle } from "./columnDrag.ts";
 import { moveColumn, setColumnWidth } from "../shared/columnOps.ts";
 import { moveById } from "../shared/order.ts";
 import { jiraSearchUrl } from "../shared/jiraUrls.ts";
+import { chartsFor, drillRows, parseAnalysisConfig, type AnalysisConfig, type Drill } from "../shared/analysis.ts";
 import { keywordClause, splitOrderBy, ticketKeyFromInput, withKeyword } from "../shared/search.ts";
 import type { NavLink } from "../shared/links.ts";
 import { attachTabDrag, isTabDragging } from "./tabDrag.ts";
@@ -53,6 +55,45 @@ let fetchedAt: string | null = null;
 let rowsError: string | null = null;
 let saveError: string | null = null;
 let rowsLoaded = false;
+// Tickets | Analysis per view (remembered in this browser), the analysis config, and the Analysis drill-down.
+const VIEW_MODE_KEY = "atlassian-notes.viewMode.";
+let analysisCfg: AnalysisConfig | null = null;
+let analysisError: string | null = null;
+const EMPTY_ANALYSIS = parseAnalysisConfig(null);
+/** Tickets narrowed from a chart click; temporary, cleared by ×, leaving the view or going back to Analysis. */
+let drill: { viewId: string; d: Drill } | null = null;
+/** The view whose Analysis entrance has played since it was last shown; it plays again only after a switch. */
+let analysisPlayedFor: string | null = null;
+
+function viewMode(id: string): "tickets" | "analysis" {
+  try {
+    return localStorage.getItem(VIEW_MODE_KEY + id) === "analysis" ? "analysis" : "tickets";
+  } catch {
+    return "tickets";
+  }
+}
+
+function setViewMode(id: string, mode: "tickets" | "analysis"): void {
+  try {
+    localStorage.setItem(VIEW_MODE_KEY + id, mode);
+  } catch {
+    // storage unavailable: the mode just isn't remembered
+  }
+  if (mode === "analysis") {
+    if (drill?.viewId === id) drill = null;
+    analysisPlayedFor = null;
+  }
+  renderChrome();
+  renderBody();
+}
+
+function onAnalysisDrill(d: Drill): void {
+  const view = activeView();
+  if (!view) return;
+  drill = { viewId: view.id, d };
+  setViewMode(view.id, "tickets");
+}
+
 // Keyword search beside the JQL bar: one input kept across renderChrome() so typing and focus survive re-renders.
 const keywordInput = h("input", {
   type: "text",
@@ -496,6 +537,8 @@ function selectTab(id: string): void {
   const dir = tabNavDir(tabIndex(activeId), tabIndex(id));
   if (jqlEditor && jqlEditor.viewId !== id) jqlEditor = null;
   if (activeId === SCRATCH_TAB && id !== SCRATCH_TAB) void flushScratchpad();
+  if (drill && drill.viewId !== id) drill = null; // a drill-down belongs to the view it came from
+  if (id !== activeId) analysisPlayedFor = null; // arriving on a view's Analysis plays its entrance
   activeId = id;
   remember(id);
   // State changes above and below stay synchronous (callers such as saveEditedView read activeId straight after);
@@ -668,7 +711,11 @@ function renderChrome(): void {
     keywordViewId = view.id;
     keywordInput.disabled = locked;
     syncKeywordClear();
+    const mode = viewMode(view.id);
+    const modeBtn = (m: "tickets" | "analysis", label: string) =>
+      h("button", { type: "button", "aria-pressed": String(mode === m), onclick: () => { if (mode !== m) setViewMode(view.id, m); } }, label);
     headerEl.append(
+      h("div", { class: "view-mode", role: "group", "aria-label": "Show tickets or analysis" }, modeBtn("tickets", "Tickets"), modeBtn("analysis", "Analysis")),
       h("div", { class: "jql-field" },
         icon("jira", "jql-icon brand-jira"),
         jql,
@@ -717,7 +764,7 @@ function renderChrome(): void {
     ...(onBoard ? [boardData?.error, boardError, opError ? saveError : null]
       : onScratch ? []
       : onReading ? [readingConfigError, readingError, opError ? saveError : null]
-      : [configError ?? rowsError, saveError]),
+      : [configError ?? rowsError, saveError, analysisError ? `${analysisError} — Analysis is showing the default charts` : null]),
     linksError,
   ].filter(Boolean).join("\n");
   errorEl.textContent = err;
@@ -904,10 +951,29 @@ function renderBody(): void {
     ...handlers,
     star: { isStarred: (k) => boardKeys.has(k), toggle: toggleStar, disabled: !boardReady || boardLocked, locked: boardReady && boardLocked },
   };
-  let shown = applyFilters(rows, view.filters);
+  if (viewMode(view.id) === "analysis") {
+    filterEl.replaceChildren();
+    filterEl.hidden = true;
+    if (!rowsLoaded) {
+      tableEl.replaceChildren(h("p", { class: "empty-state" }, "Loading…"));
+      return;
+    }
+    const animate = analysisPlayedFor !== view.id;
+    analysisPlayedFor = view.id;
+    renderAnalysis(tableEl, { rows, viewId: view.id, cfg: analysisCfg, columns, now: new Date(), animate }, {
+      onDrill: onAnalysisDrill,
+      onOpenTicket: (key) => openDrawer(key),
+    });
+    return;
+  }
+  if (drill && drill.viewId !== view.id) drill = null;
+  const settings = chartsFor(analysisCfg, view.id, false).settings;
+  const base = drill ? drillRows(rows, drill.d, analysisCfg ?? EMPTY_ANALYSIS, settings, new Date()) : rows;
+  let shown = applyFilters(base, view.filters);
   const locked = viewsLocked();
+  const drillChip = drill ? { label: drill.d.label, onClear: () => { drill = null; renderBody(); } } : undefined;
   if (locked) filterEl.replaceChildren();
-  else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged);
+  else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged, drillChip);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
   renderTable(tableEl, view, shown, columns, locked ? { ...tableHandlers, onToggleDisplay: undefined, onResizeColumn: undefined, onMoveColumn: undefined } : tableHandlers, sort);
 }
@@ -918,6 +984,8 @@ async function loadConfig(): Promise<void> {
     if (pendingViewSaves === 0) views = cfg.views; // else a queued save holds newer views; its own live event reloads
     columns = cfg.columns;
     jiraBaseUrl = cfg.jiraBaseUrl;
+    analysisCfg = cfg.analysis ?? null;
+    analysisError = cfg.analysisError ?? null;
     defaultProject = cfg.defaultProject ?? null;
     navLinks = cfg.links ?? [];
     linksError = cfg.linksError ?? null;
@@ -1005,6 +1073,7 @@ function onLive(e: LiveEvent): void {
     case "views":
     case "columns":
     case "links":
+    case "analysis":
       void loadConfig();
       break;
     case "board":
@@ -1170,6 +1239,14 @@ function paletteCommands(query: string): PaletteCommand[] {
   const view = activeView();
   if (view) {
     cs.push({ id: "view-refresh", label: "Refresh from Jira", group: "View", keywords: ["reload"], run: () => void doRefresh() });
+    const mode = viewMode(view.id);
+    cs.push({
+      id: "view-mode",
+      label: mode === "analysis" ? "Show tickets" : "Show analysis",
+      group: "View",
+      keywords: ["analysis", "charts", "tickets", "table"],
+      run: () => setViewMode(view.id, mode === "analysis" ? "tickets" : "analysis"),
+    });
     if (!locked) {
       cs.push(
         { id: "view-jql", label: "Edit JQL", group: "View", keywords: ["query"], run: () => startJqlEdit(view) },
