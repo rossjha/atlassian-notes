@@ -37,6 +37,7 @@ jira/tickets/KEY.md   generated ticket files for Obsidian (generated; edits are 
 scratchpad.excalidraw the Scratchpad tab's drawing
 links.yaml            optional links in the top bar
 reading.yaml          reading list statuses, categories, prompts and the Claude prompt
+analysis.yaml         optional: charts for each view's Analysis side
 reading/items/<id>.md a reading list item: details at the top, your note below
 reading/groom/<id>.md Claude's summary of a reading item (the app only reads it)
 .cache/               last Jira results, so the app opens instantly
@@ -77,6 +78,36 @@ Optional keys:
 - `groomPrompt`: the text that Copy → "Groom prompt for Claude" copies. Placeholders `{key}`, `{url}` and `{groomPath}` are filled in per ticket. The default asks for a skill called `groom-work-item` (the author's own); change it to name your own grooming skill or prompt.
 
 Finding your field ids: open `https://<your-site>/rest/api/3/field` in a browser while logged in to Jira and search for "Story point estimate" and "Sprint". The `id` is the `customfield_NNNNN` value. Custom column values are stored in each note's front matter. Option lists are only edited in this file, but you filter on them from the UI.
+
+## Analysis
+
+Every view tab has a **Tickets | Analysis** toggle at the left of its header (also "Show analysis" in ⌘K). Analysis draws charts from the tickets the view already fetched (before your filter chips), so it never calls Jira itself. The browser remembers which side each view was on.
+
+Charts come from an optional `analysis.yaml` in your notes folder; copy `examples/analysis.example.yaml` to start. A view that isn't listed gets a default set: the sprint countdown (when its tickets share an active sprint), headline numbers, progress, open work per person, needs attention, and a bar chart by component. Edits show up straight away. If the file has a mistake, the red bar says what and where, and every view shows the default charts until it's fixed.
+
+- **settings:** `measure` (`points` or `tickets`), `movingDays`, `stalledDays`, `lowLoad`, `freeze` (the release freeze as a working day of the sprint, e.g. `W2/D3`), `blocked` (`statuses`, `flagField`, `links`) and `fields` (extra Jira field ids to fetch). A view can override any of these under `views.<id>.settings`, except `fields` and `blocked.flagField`, which apply to all views.
+- **groups:** named groups of components, e.g. a `product` set where Payments is `[payments-api, payments UI, infra]`, or a `layer` set where Frontend is `["* UI"]`. `*` matches anything and case doesn't matter. A ticket counts in every group one of its components matches; anything matching none is **Other**.
+- **views:** for each view id, `charts:` in order. Each is a type, or `{type, by, title, measure}`:
+
+| type | shows |
+|---|---|
+| `countdown` | where today falls in the sprint (W1/D3), the working days, days to the freeze and days left |
+| `headlines` | Done %, Moving, Stalled, Blocked (and unassigned) |
+| `progress` | done / in progress / to do as one bar |
+| `bars`, `donut` | a split `by` something |
+| `statusBars` | a split `by` something, each row by status, with its share |
+| `complete` | % complete by points and by tickets |
+| `completeBy` | % complete for each value of `by` |
+| `perPerson` | open work per assignee, with anyone under `lowLoad` marked low |
+| `attention` | blocked tickets (and why), then stalled ones |
+
+`by` is `assignee`, `status`, `type`, `priority`, `component`, `label`, `group:<set>`, `column:<your column id>` or `field:<jira field id>` (listed in `fields`).
+
+- **Stalled:** in progress, not blocked, and not updated for more than `stalledDays`. **Moving:** in progress, not blocked, updated within `movingDays`. **Blocked:** not done, and in a `blocked.statuses` status, flagged in Jira (when `flagField` is set), or with an "is blocked by" link to a ticket that isn't done.
+- Working days are Monday to Friday. Sprint dates, the flag and extra fields arrive with the next refresh after you add them.
+- With points, unestimated tickets count as 0 and the chart says how many there are. Someone whose open work includes unestimated tickets is never marked low.
+- When a ticket is in more than one group, each share is of the view's real total, so shares can add up to more than 100% (the chart says so).
+- **Click-through:** click a bar, a donut slice or its legend, a person, or a headline number to see just those tickets on the Tickets side. A "From analysis" chip shows what you clicked; it isn't saved, and × (or going back to Analysis, or another tab) clears it. Click a row under Needs attention to open the ticket.
 
 ## Kanban
 
