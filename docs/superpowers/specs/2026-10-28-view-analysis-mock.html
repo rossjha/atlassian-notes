@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Analysis mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#050505; --surface:#0a0a0a; --surface-2:#141414; --fg:#e5e5e5; --muted:#8a8a8a; --dim:#3a3a3a; --border:#1f1f1f; --accent:#f5c518;
+    --c1:#f5c518; --c2:#22d3ee; --c3:#a78bfa; --c4:#fb923c; --c5:#e5e5e5; --success:#4ade80; --warn:#fb923c; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:12px/1.5 "JetBrains Mono", monospace; padding:24px; }
+  h1 { font-size:14px; margin:0 0 4px; } .sub { color:var(--muted); margin:0 0 20px; }
+  .frame { border:1px solid var(--border); background:var(--bg); margin-bottom:36px; }
+  .cap { color:var(--accent); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin:0 0 8px; }
+  .tabs { display:flex; gap:22px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--border); color:var(--muted); }
+  .tabs .on { color:var(--fg); border-bottom:2px solid var(--accent); padding-bottom:4px; }
+  .hdr { display:flex; gap:10px; align-items:center; padding:10px 16px; }
+  .jql { flex:1; border:1px solid var(--border); background:var(--surface); padding:3px 8px; color:var(--muted); }
+  .seg { display:inline-flex; border:1px solid var(--border); }
+  .seg span { padding:3px 10px; color:var(--muted); } .seg .on { background:var(--surface-2); color:var(--fg); box-shadow: inset 0 -2px 0 var(--accent); }
+  .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:12px; padding:4px 16px 16px; }
+  .card { border:1px solid var(--border); background:var(--surface); padding:12px; min-width:0; }
+  .card h3 { margin:0 0 10px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600; display:flex; justify-content:space-between; }
+  .card h3 em { font-style:normal; color:var(--dim); text-transform:none; letter-spacing:0; }
+  .kpi { font-size:22px; font-weight:600; } .kpi small { font-size:11px; color:var(--muted); font-weight:400; }
+  .s3{grid-column:span 3} .s4{grid-column:span 4} .s5{grid-column:span 5} .s6{grid-column:span 6} .s7{grid-column:span 7} .s8{grid-column:span 8} .s12{grid-column:span 12}
+  .stack { display:flex; height:14px; gap:2px; } .stack i { display:block; height:100%; }
+  .legend { display:flex; gap:14px; margin-top:8px; color:var(--muted); font-size:11px; } .legend b { display:inline-block; width:8px; height:8px; margin-right:5px; vertical-align:0; }
+  .bl { display:grid; grid-template-columns:7rem 1fr 3.5rem; gap:6px 10px; align-items:center; }
+  .bl .bar { height:10px; background:var(--surface-2); position:relative; } .bl .bar i { position:absolute; inset:0 auto 0 0; }
+  .bl .n { text-align:right; color:var(--muted); }
+  .low { color:var(--c2); } .flag { color:var(--warn); }
+  table { width:100%; border-collapse:collapse; } td,th { text-align:left; padding:4px 6px; border-top:1px solid var(--border); } th { color:var(--muted); font-weight:400; font-size:10px; text-transform:uppercase; letter-spacing:.08em; border:none; }
+  .pill { border:1px solid var(--border); padding:0 6px; font-size:11px; }
+  .ip { color:var(--c2); border-color:color-mix(in srgb,var(--c2) 50%,transparent); }
+  .donutwrap { display:flex; gap:16px; align-items:center; }
+  .rows { display:grid; gap:8px; }
+  .row2 { display:grid; grid-template-columns:6rem 1fr 3rem; gap:10px; align-items:center; }
+  .note { color:var(--muted); font-size:11px; margin-top:8px; }
+  .callout { border-left:2px solid var(--accent); padding:6px 10px; color:var(--muted); margin:0 16px 14px; background:var(--surface); }
+</style></head><body>
+<h1>Analysis tab — v2: countdown + blocked</h1>
+<p class="sub">Two views of the same idea. Made-up data. Colours are your theme's chart colours, so every theme gets its own.</p>
+
+<p class="cap">A · Current sprint view → Analysis</p>
+<div class="frame">
+  <div class="tabs"><span>▥</span><span>✎</span><span>⌓</span><span class="on">Current sprint</span><span>Next sprint</span><span>Backlog</span><span>Epic: Notifications</span></div>
+  <div class="hdr"><div class="seg"><span>Tickets</span><span class="on">Analysis</span></div><div class="jql">project = PAY AND sprint in openSprints() ORDER BY rank</div><span style="color:var(--muted)">Last refreshed 2m ago ⟳</span></div>
+  <div class="grid">
+    <div class="card s12" style="display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+      <div><div class="kpi">W1/D4 <small>today · Sprint 42</small></div></div>
+      <div style="flex:1;min-width:260px">
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px">
+          <i style="height:16px;background:var(--success)"></i><i style="height:16px;background:var(--success)"></i><i style="height:16px;background:var(--success)"></i><i style="height:16px;background:var(--accent)"></i><i style="height:16px;background:var(--surface-2)"></i><i style="height:16px;background:var(--surface-2)"></i><i style="height:16px;background:var(--surface-2)"></i><i style="height:16px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--warn)"></i><i style="height:16px;background:var(--surface-2)"></i><i style="height:16px;background:var(--surface-2)"></i>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:3px;color:var(--muted);font-size:10px;margin-top:3px"><span>M</span><span>T</span><span>W</span><span style="color:var(--accent)">T</span><span>F</span><span>M</span><span>T</span><span class="flag">W ❄</span><span>T</span><span>F</span></div>
+      </div>
+      <div><div class="kpi flag">4 <small>working days to freeze (W2/D3)</small></div></div>
+      <div><div class="kpi">6 <small>working days left · ends Fri 7 Nov</small></div></div>
+    </div>
+
+    <div class="card s3"><h3>Done</h3><div class="kpi">41% <small>of 58 pts</small></div><div class="note">24 done · 19 in progress · 15 to do</div></div>
+    <div class="card s3"><h3>Moving <em>updated ≤ 2d</em></h3><div class="kpi">11 <small>tickets</small></div><div class="note">of 14 in progress</div></div>
+    <div class="card s3"><h3>Stalled <em>no update &gt; 3d</em></h3><div class="kpi flag">3 <small>tickets</small></div><div class="note">8 pts at risk</div></div>
+    <div class="card s3"><h3>Blocked</h3><div class="kpi flag">2 <small>tickets</small></div><div class="note">1 flagged · 1 blocked by open ticket · 2 unassigned</div></div>
+
+    <div class="card s12"><h3>Progress <em>by status, points</em></h3>
+      <div class="stack"><i style="width:41%;background:var(--success)"></i><i style="width:33%;background:var(--c2)"></i><i style="width:26%;background:var(--dim)"></i></div>
+      <div class="legend"><span><b style="background:var(--success)"></b>Done 24</span><span><b style="background:var(--c2)"></b>In progress 19</span><span><b style="background:var(--dim)"></b>To do 15</span></div>
+    </div>
+
+    <div class="card s6"><h3>Open work per person <em>points not done</em></h3>
+      <div class="bl">
+        <span>Alex</span><div class="bar"><i style="width:90%;background:var(--c1)"></i></div><span class="n">9</span>
+        <span>Sam</span><div class="bar"><i style="width:70%;background:var(--c1)"></i></div><span class="n">7</span>
+        <span>Priya</span><div class="bar"><i style="width:60%;background:var(--c1)"></i></div><span class="n">6</span>
+        <span>Jordan</span><div class="bar"><i style="width:50%;background:var(--c1)"></i></div><span class="n">5</span>
+        <span class="low">Mo ↓ low</span><div class="bar"><i style="width:10%;background:var(--c2)"></i></div><span class="n low">1</span>
+        <span style="color:var(--muted)">Unassigned</span><div class="bar"><i style="width:50%;background:var(--dim)"></i></div><span class="n">5</span>
+      </div>
+      <div class="note">"Low" = under a threshold you set (here 3 pts). Click a name → Tickets tab filtered to them.</div>
+    </div>
+
+    <div class="card s6"><h3>Needs attention <em>blocked, then stalled</em></h3>
+      <table><tr><th>Key</th><th>Summary</th><th>Who</th><th>Why</th></tr>
+        <tr><td>PAY-405</td><td>Push provider sandbox</td><td>Jordan</td><td class="flag">⚑ flagged</td></tr>
+        <tr><td>PAY-417</td><td>Email template service</td><td>Mo</td><td class="flag">⛔ by PAY-405</td></tr>
+        <tr><td>PAY-412</td><td>Retry webhook on 5xx</td><td>Sam</td><td class="flag">idle 6d</td></tr>
+        <tr><td>PAY-398</td><td>Refund ledger export</td><td>Alex</td><td class="flag">idle 5d</td></tr>
+        <tr><td>PAY-420</td><td>Card form a11y fixes</td><td>Priya</td><td class="flag">idle 4d</td></tr>
+      </table>
+      <div class="note">Click a row → the ticket panel, as in the table.</div>
+    </div>
+
+    <div class="card s6"><h3>Split by product <em>points</em></h3>
+      <div class="donutwrap">
+        <svg width="110" height="110" viewBox="0 0 42 42"><g transform="rotate(-90 21 21)" fill="none" stroke-width="6">
+          <circle r="15.9" cx="21" cy="21" stroke="var(--c1)" stroke-dasharray="45 55"></circle>
+          <circle r="15.9" cx="21" cy="21" stroke="var(--c2)" stroke-dasharray="30 70" stroke-dashoffset="-45"></circle>
+          <circle r="15.9" cx="21" cy="21" stroke="var(--c3)" stroke-dasharray="17 83" stroke-dashoffset="-75"></circle>
+          <circle r="15.9" cx="21" cy="21" stroke="var(--dim)" stroke-dasharray="8 92" stroke-dashoffset="-92"></circle></g>
+          <text x="21" y="23" text-anchor="middle" fill="var(--fg)" font-size="6" font-family="JetBrains Mono">58</text></svg>
+        <div class="rows">
+          <div><b style="display:inline-block;width:8px;height:8px;background:var(--c1)"></b> Payments 26</div>
+          <div><b style="display:inline-block;width:8px;height:8px;background:var(--c2)"></b> Notifications 17</div>
+          <div><b style="display:inline-block;width:8px;height:8px;background:var(--c3)"></b> Platform 10</div>
+          <div style="color:var(--muted)"><b style="display:inline-block;width:8px;height:8px;background:var(--dim)"></b> Other 5</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card s6"><h3>Frontend vs backend <em>done / in progress / to do</em></h3>
+      <div class="rows">
+        <div class="row2"><span>Frontend</span><div class="stack"><i style="width:30%;background:var(--success)"></i><i style="width:25%;background:var(--c2)"></i><i style="width:10%;background:var(--dim)"></i></div><span class="n" style="text-align:right;color:var(--muted)">22</span></div>
+        <div class="row2"><span>Backend</span><div class="stack"><i style="width:40%;background:var(--success)"></i><i style="width:30%;background:var(--c2)"></i><i style="width:25%;background:var(--dim)"></i></div><span class="n" style="text-align:right;color:var(--muted)">31</span></div>
+        <div class="row2"><span style="color:var(--muted)">Other</span><div class="stack"><i style="width:5%;background:var(--success)"></i><i style="width:3%;background:var(--dim)"></i></div><span class="n" style="text-align:right;color:var(--muted)">5</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="cap">B · Epic refinement view → Analysis</p>
+<div class="frame">
+  <div class="tabs"><span>▥</span><span>✎</span><span>⌓</span><span>Current sprint</span><span>Next sprint</span><span>Backlog</span><span class="on">Epic: Notifications</span></div>
+  <div class="hdr"><div class="seg"><span>Tickets</span><span class="on">Analysis</span></div><div class="jql">parent = PAY-300 ORDER BY rank</div><span style="color:var(--muted)">Last refreshed 1h ago ⟳</span></div>
+  <div class="grid">
+    <div class="card s4"><h3>Complete</h3>
+      <div class="donutwrap">
+        <svg width="96" height="96" viewBox="0 0 42 42"><circle r="15.9" cx="21" cy="21" fill="none" stroke="var(--surface-2)" stroke-width="5"></circle>
+          <circle r="15.9" cx="21" cy="21" fill="none" stroke="var(--success)" stroke-width="5" stroke-dasharray="35 65" transform="rotate(-90 21 21)"></circle>
+          <text x="21" y="23.5" text-anchor="middle" fill="var(--fg)" font-size="7" font-family="JetBrains Mono">35%</text></svg>
+        <div class="note" style="margin:0">by points: 28 of 80<br>by tickets: 9 of 23<br>4 unestimated</div>
+      </div>
+    </div>
+    <div class="card s8"><h3>Frontend vs backend <em>points, by status</em></h3>
+      <div class="rows">
+        <div class="row2"><span>Frontend</span><div class="stack"><i style="width:15%;background:var(--success)"></i><i style="width:10%;background:var(--c2)"></i><i style="width:20%;background:var(--dim)"></i></div><span style="text-align:right;color:var(--muted)">36</span></div>
+        <div class="row2"><span>Backend</span><div class="stack"><i style="width:25%;background:var(--success)"></i><i style="width:8%;background:var(--c2)"></i><i style="width:22%;background:var(--dim)"></i></div><span style="text-align:right;color:var(--muted)">44</span></div>
+      </div>
+      <div class="legend"><span><b style="background:var(--success)"></b>Done</span><span><b style="background:var(--c2)"></b>In progress</span><span><b style="background:var(--dim)"></b>To do</span><span>45% FE · 55% BE</span></div>
+    </div>
+    <div class="card s6"><h3>By component <em>points</em></h3>
+      <div class="bl">
+        <span>notify-api</span><div class="bar"><i style="width:80%;background:var(--c3)"></i></div><span class="n">24</span>
+        <span>notify-ui</span><div class="bar"><i style="width:65%;background:var(--c3)"></i></div><span class="n">20</span>
+        <span>web-ui</span><div class="bar"><i style="width:50%;background:var(--c3)"></i></div><span class="n">16</span>
+        <span>infra</span><div class="bar"><i style="width:33%;background:var(--c3)"></i></div><span class="n">10</span>
+        <span style="color:var(--muted)">(none)</span><div class="bar"><i style="width:33%;background:var(--dim)"></i></div><span class="n">10</span>
+      </div>
+    </div>
+    <div class="card s6"><h3>By product <em>% complete each</em></h3>
+      <div class="rows">
+        <div class="row2"><span>Notifications</span><div class="stack" style="background:var(--surface-2)"><i style="width:40%;background:var(--success)"></i></div><span style="text-align:right">40%</span></div>
+        <div class="row2"><span>Payments</span><div class="stack" style="background:var(--surface-2)"><i style="width:25%;background:var(--success)"></i></div><span style="text-align:right">25%</span></div>
+        <div class="row2"><span>Platform</span><div class="stack" style="background:var(--surface-2)"><i style="width:10%;background:var(--success)"></i></div><span style="text-align:right">10%</span></div>
+      </div>
+      <div class="note">Products = your component groups in analysis.yaml.</div>
+    </div>
+  </div>
+</div>
+
+<p class="cap">How it's switched</p>
+<div class="callout">Tickets / Analysis is a small toggle at the left of each view's header, so every view tab gets an Analysis side. Alt: a separate "Analysis" tab in the top bar that analyses whichever view you pick. Which feels right?</div>
+</body></html>
