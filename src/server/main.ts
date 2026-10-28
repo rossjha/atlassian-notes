@@ -8,7 +8,7 @@ import { createApp } from "./app.ts";
 import { BoardService } from "./boardService.ts";
 import { ViewCache } from "./cache.ts";
 import { ConfigError, loadConfig, type Config } from "./config.ts";
-import { ensureDataDir, loadColumns, loadReadingConfig, loadViews } from "./configFiles.ts";
+import { ensureDataDir, loadAnalysis, loadColumns, loadReadingConfig, loadViews } from "./configFiles.ts";
 import { createJiraClient, type JiraClient } from "./jira.ts";
 import { NotesStore } from "./notesStore.ts";
 import { ReadingStore } from "./readingStore.ts";
@@ -43,6 +43,20 @@ async function main(): Promise<void> {
   }
   await ensureDataDir(config.notesDir, config.defaultProject, path.join(root, "examples"));
 
+  // analysis.yaml's extra fields and flag field join every Jira search. A broken file keeps the last good
+  // values, so a typo doesn't empty field-based charts or the flag rule on the next refresh.
+  let analysisFetch: { fields: string[]; flagField: string | null } = { fields: [], flagField: null };
+  const reloadAnalysisFetch = async (): Promise<void> => {
+    try {
+      const a = await loadAnalysis(config.notesDir);
+      analysisFetch = { fields: a?.settings.fields ?? [], flagField: a?.settings.blocked.flagField ?? null };
+    } catch (e) {
+      console.warn(`${(e as Error).message}; keeping the last good analysis fields`);
+    }
+  };
+  await reloadAnalysisFetch();
+  const analysisFields = { extraFields: () => analysisFetch.fields, flagField: () => analysisFetch.flagField };
+
   const makeClient = async (): Promise<JiraClient> =>
     createJiraClient({
       apiBase: config.jiraApiBase,
@@ -50,6 +64,7 @@ async function main(): Promise<void> {
       email: config.jiraEmail,
       token: config.jiraApiToken,
       fields: (await loadColumns(config.notesDir)).jiraFields,
+      ...analysisFields,
     });
 
   // Field mapping lives in columns.yaml, so the real client is rebuilt when that file changes.
@@ -64,6 +79,7 @@ async function main(): Promise<void> {
       email: config.jiraEmail,
       token: config.jiraApiToken,
       fields: { storyPoints: null, sprint: "customfield_10020", acceptanceCriteria: null },
+      ...analysisFields,
     });
   }
   const jira: JiraClient = {
@@ -141,6 +157,7 @@ async function main(): Promise<void> {
   refresher.refreshAll().catch((e) => console.error("initial refresh failed:", e instanceof Error ? e.message : e));
 
   watchNotesDir(config.notesDir, (e) => {
+    if (e.type === "analysis") void reloadAnalysisFetch();
     if (e.type === "columns") {
       makeClient().then((c) => { inner = c; }, () => {});
     }

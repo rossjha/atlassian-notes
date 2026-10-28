@@ -145,6 +145,7 @@ export type LiveEvent =
   | { type: "orphans" }
   | { type: "reading" | "readingGroom"; id: string }
   | { type: "readingConfig" }
+  | { type: "analysis" }
   | { type: "board" };
 
 export interface BoardCard {

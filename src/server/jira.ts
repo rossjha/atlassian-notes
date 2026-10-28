@@ -24,7 +24,29 @@ interface Opts {
   email: string;
   token: string;
   fields: ColumnsConfig["jiraFields"];
+  /** analysis.yaml settings.fields: extra field ids fetched into Ticket.extra (read on every search). */
+  extraFields?: () => string[];
+  /** analysis.yaml blocked.flagField: Jira's Flagged field id, fetched into Ticket.flagged. */
+  flagField?: () => string | null;
 }
+
+/** A custom field's value as text: an option's value or name, a string or number, or a list of those joined. */
+function fieldText(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "string") return v.trim() === "" ? null : v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    const parts = v.map(fieldText).filter((x): x is string => x !== null);
+    return parts.length ? parts.join(", ") : null;
+  }
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    for (const k of ["value", "name", "displayName", "key"]) if (typeof o[k] === "string" && o[k] !== "") return o[k] as string;
+  }
+  return null;
+}
+
+const CATEGORY_KEYS = new Set(["new", "indeterminate", "done"]);
 
 type Json = Record<string, any>;
 
@@ -85,11 +107,16 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
     }
   }
 
+  const extraIds = (): string[] => opts.extraFields?.() ?? [];
+  const flagId = (): string | null => opts.flagField?.() ?? null;
+
   function fieldList(extra: string[] = []): string {
-    const f = [...BASE_FIELDS, ...extra];
+    const f = [...BASE_FIELDS, ...extra, ...extraIds()];
+    const flag = flagId();
+    if (flag) f.push(flag);
     if (opts.fields.storyPoints) f.push(opts.fields.storyPoints);
     f.push(opts.fields.sprint);
-    return f.join(",");
+    return [...new Set(f)].join(",");
   }
 
   function mapTicket(issue: Json): Ticket {
@@ -100,10 +127,17 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
     for (const l of Array.isArray(f.issuelinks) ? f.issuelinks : []) {
       // Jira words the relationship from this ticket's side: outward phrase for outwardIssue, inward for inwardIssue.
       const out = l?.outwardIssue, inn = l?.inwardIssue;
-      if (typeof out?.key === "string") links.push({ type: String(l.type?.outward ?? ""), direction: "outward", key: out.key });
-      else if (typeof inn?.key === "string") links.push({ type: String(l.type?.inward ?? ""), direction: "inward", key: inn.key });
+      const link = (other: Json, type: unknown, direction: "inward" | "outward"): TicketLink => {
+        const cat = other?.fields?.status?.statusCategory?.key;
+        return { type: String(type ?? ""), direction, key: other.key, ...(typeof cat === "string" ? { done: cat === "done" } : {}) };
+      };
+      if (typeof out?.key === "string") links.push(link(out, l.type?.outward, "outward"));
+      else if (typeof inn?.key === "string") links.push(link(inn, l.type?.inward, "inward"));
     }
     const sprint = sprints.find((s) => s?.state === "active") ?? sprints[sprints.length - 1];
+    const catKey = f.status?.statusCategory?.key;
+    const extra = opts.extraFields ? Object.fromEntries(extraIds().map((id) => [id, fieldText(f[id])])) : null;
+    const flag = flagId();
     return {
       id: String(issue.id),
       key: issue.key,
@@ -124,8 +158,16 @@ export function createJiraClient(opts: Opts, fetchFn: typeof fetch = fetch): Jir
       sprint: sprint?.name ?? null,
       sprints: sprints
         .filter((s) => typeof s?.name === "string")
-        .map((s) => ({ name: s.name as string, state: typeof s.state === "string" ? s.state : "" })),
+        .map((s) => ({
+          name: s.name as string,
+          state: typeof s.state === "string" ? s.state : "",
+          ...(typeof s.startDate === "string" && s.startDate ? { startDate: toIso(s.startDate) } : {}),
+          ...(typeof s.endDate === "string" && s.endDate ? { endDate: toIso(s.endDate) } : {}),
+        })),
       links,
+      ...(CATEGORY_KEYS.has(catKey) ? { statusCategoryKey: catKey } : {}),
+      ...(extra ? { extra } : {}),
+      ...(flag ? { flagged: fieldText(f[flag]) !== null } : {}),
       updated: toIso(f.updated),
     };
   }

@@ -6,7 +6,8 @@ import type { ViewCache } from "./cache.ts";
 import type { Config } from "./config.ts";
 import { BoardOpError } from "./board.ts";
 import { BOARD_CACHE_ID, type BoardService } from "./boardService.ts";
-import { ConfigFileError, DEFAULT_READING_CONFIG, loadColumns, loadLinks, loadReadingConfig, loadViews, saveViews, validateViews } from "./configFiles.ts";
+import type { AnalysisConfig } from "../shared/analysis.ts";
+import { ConfigFileError, DEFAULT_READING_CONFIG, loadAnalysis, loadColumns, loadLinks, loadReadingConfig, loadViews, saveViews, validateViews } from "./configFiles.ts";
 import { bothMarkdown, groomPrompt, readingBothMarkdown, readingLinkMarkdown, readingPrompt, ticketMarkdown } from "./copyText.ts";
 import { InvalidKeyError, isValidKey, parseFrontMatter } from "./frontMatter.ts";
 import { JiraError, type JiraClient } from "./jira.ts";
@@ -361,7 +362,15 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
         error = err.message;
       }
       const { links, error: linksError } = await loadLinks(config.notesDir);
-      return send(res, 200, { views, columns, jiraBaseUrl: config.jiraBaseUrl, defaultProject: config.defaultProject, error, links, linksError });
+      let analysis: AnalysisConfig | null = null;
+      let analysisError: string | null = null;
+      try {
+        analysis = await loadAnalysis(config.notesDir);
+      } catch (err) {
+        if (!(err instanceof ConfigFileError)) throw err;
+        analysisError = err.message;
+      }
+      return send(res, 200, { views, columns, jiraBaseUrl: config.jiraBaseUrl, defaultProject: config.defaultProject, error, links, linksError, analysis, analysisError });
     }
     if (method === "PUT" && a === "views" && segs.length === 1) {
       const body = await readJson(req);

@@ -206,3 +206,7 @@ test("applyBoardOp add/move/remove work for reading:<id>", () => {
   assert.deepEqual(applyBoardOp(moved, { op: "remove", key: "reading:2026-10-25-a" }).cards.Done, ["C-3"]);
   assert.throws(() => applyBoardOp(b, { op: "add", key: "reading:Bad Id" }), BoardOpError);
 });
+
+test("eventForPath maps analysis.yaml", () => {
+  assert.deepEqual(eventForPath("analysis.yaml"), { type: "analysis" });
+});

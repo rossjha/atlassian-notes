@@ -1,0 +1,29 @@
+{
+  "isLast": true,
+  "issues": [
+    {
+      "id": "30001",
+      "key": "PAY-7",
+      "fields": {
+        "summary": "Analysis fields",
+        "status": { "name": "In Review", "statusCategory": { "key": "indeterminate", "name": "In Progress" } },
+        "customfield_10020": [
+          { "id": 12, "name": "Sprint 12", "state": "active", "startDate": "2026-10-26T09:00:00.000+0000", "endDate": "2026-11-06T17:00:00.000+0000" }
+        ],
+        "issuelinks": [
+          { "type": { "inward": "is blocked by", "outward": "blocks" }, "inwardIssue": { "key": "PAY-8", "fields": { "status": { "statusCategory": { "key": "done" } } } } },
+          { "type": { "inward": "is blocked by", "outward": "blocks" }, "inwardIssue": { "key": "PAY-9", "fields": { "status": { "statusCategory": { "key": "new" } } } } }
+        ],
+        "customfield_00001": [{ "id": "1", "value": "Impediment" }],
+        "customfield_00002": { "id": "5", "value": "Gold" },
+        "customfield_00003": "plain text",
+        "customfield_00004": [{ "value": "A" }, { "name": "B" }]
+      }
+    },
+    {
+      "id": "30002",
+      "key": "PAY-10",
+      "fields": { "summary": "Nothing set", "customfield_00001": null, "customfield_00002": null }
+    }
+  ]
+}

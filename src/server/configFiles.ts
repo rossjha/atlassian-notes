@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { parseAnalysisConfig, type AnalysisConfig } from "../shared/analysis.ts";
 import path from "node:path";
 import YAML from "yaml";
 import { BUILTIN_COLUMNS } from "../shared/types.ts";
@@ -220,6 +221,18 @@ export function validateViews(
 
 export async function saveViews(notesDir: string, views: View[]): Promise<void> {
   await atomicWrite(path.join(notesDir, "views.yaml"), YAML.stringify({ views }));
+}
+
+/** analysis.yaml (optional; null when missing). Any problem is a ConfigFileError naming the file. */
+export async function loadAnalysis(notesDir: string): Promise<AnalysisConfig | null> {
+  const file = path.join(notesDir, "analysis.yaml");
+  const raw = await readYaml(file);
+  if (raw === null) return null;
+  try {
+    return parseAnalysisConfig(raw);
+  } catch (e) {
+    throw new ConfigFileError(file, (e as Error).message);
+  }
 }
 
 /** Used when reading.yaml is missing (it matches examples/reading.example.yaml) and when it is broken. */

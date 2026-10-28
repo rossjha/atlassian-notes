@@ -1,3 +1,4 @@
+import type { AnalysisConfig } from "../shared/analysis.ts";
 import type { NavLink } from "../shared/links.ts";
 import type { BoardOp, BoardResponse, ColumnsConfig, GroomFile, IssueDetail, NoteFile, ReadingItem, ReadingListResponse, ReadingSummary, Row, View } from "../shared/types.ts";
 
@@ -11,6 +12,9 @@ export interface ConfigResponse {
   links: NavLink[];
   /** links.yaml problems (bad entries are skipped; the rest still show). */
   linksError: string | null;
+  /** analysis.yaml, or null when it's missing or broken (then analysisError says why). */
+  analysis: AnalysisConfig | null;
+  analysisError: string | null;
 }
 
 export interface RowsResponse {

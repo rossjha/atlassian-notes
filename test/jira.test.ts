@@ -210,3 +210,33 @@ test("ignores malformed link entries and nameless sprints", async () => {
   assert.deepEqual(t.links, [{ type: "relates to", direction: "outward", key: "PAY-6" }]);
   assert.deepEqual(t.sprints, [{ name: "Sprint 13", state: "" }]);
 });
+
+test("analysis: extra and flag fields are fetched and mapped", async () => {
+  const { fn, calls } = fakeFetch([{ body: fixture("search-analysis.json") }]);
+  const c = createJiraClient({
+    apiBase: SITE, siteUrl: SITE, email: "e", token: "t", fields: FIELDS,
+    extraFields: () => ["customfield_00002", "customfield_00003", "customfield_00004", "customfield_00005"],
+    flagField: () => "customfield_00001",
+  }, fn);
+  const [a, b] = await c.search("x", 10);
+  const fields = new URL(calls[0].url).searchParams.get("fields")!.split(",");
+  for (const f of ["customfield_00001", "customfield_00002", "customfield_00003", "customfield_00004"]) assert.ok(fields.includes(f), f);
+  assert.equal(a.statusCategoryKey, "indeterminate");
+  assert.equal(a.flagged, true);
+  assert.deepEqual(a.extra, { customfield_00002: "Gold", customfield_00003: "plain text", customfield_00004: "A, B", customfield_00005: null });
+  assert.deepEqual(a.sprints, [{ name: "Sprint 12", state: "active", startDate: "2026-10-26T09:00:00.000Z", endDate: "2026-11-06T17:00:00.000Z" }]);
+  assert.deepEqual(a.links, [
+    { type: "is blocked by", direction: "inward", key: "PAY-8", done: true },
+    { type: "is blocked by", direction: "inward", key: "PAY-9", done: false },
+  ]);
+  assert.equal(b.flagged, false);
+  assert.equal(b.statusCategoryKey, undefined);
+  assert.deepEqual(b.extra, { customfield_00002: null, customfield_00003: null, customfield_00004: null, customfield_00005: null });
+});
+
+test("analysis: no extra or flag fields configured leaves tickets as before", async () => {
+  const { fn } = fakeFetch([{ body: fixture("search-analysis.json") }]);
+  const [a] = await client(fn).search("x", 10);
+  assert.equal("extra" in a, false);
+  assert.equal("flagged" in a, false);
+});

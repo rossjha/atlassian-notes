@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ConfigFileError, DEFAULT_READING_CONFIG, ensureDataDir, loadColumns, loadReadingConfig, loadViews, saveViews } from "../src/server/configFiles.ts";
+import { ConfigFileError, DEFAULT_READING_CONFIG, ensureDataDir, loadAnalysis, loadColumns, loadReadingConfig, loadViews, saveViews } from "../src/server/configFiles.ts";
 
 const examples = fileURLToPath(new URL("../examples/", import.meta.url));
 let dir: string;
@@ -226,4 +226,23 @@ test("a view's keyword search round-trips; blank or non-string is dropped", asyn
   const loaded = await loadViews(dir, columns);
   assert.equal("search" in loaded[0]!, false);
   assert.equal("search" in loaded[1]!, false);
+});
+
+test("loadAnalysis: missing is null, valid parses, broken names the file", async () => {
+  assert.equal(await loadAnalysis(dir), null);
+  await fs.writeFile(path.join(dir, "analysis.yaml"), "settings:\n  stalledDays: 5\nviews:\n  current:\n    charts: [headlines]\n");
+  const a = (await loadAnalysis(dir))!;
+  assert.equal(a.settings.stalledDays, 5);
+  assert.deepEqual(a.views.current!.charts, [{ type: "headlines" }]);
+  await fs.writeFile(path.join(dir, "analysis.yaml"), "views:\n  current:\n    charts: [pie]\n");
+  await assert.rejects(loadAnalysis(dir), (e: unknown) => e instanceof ConfigFileError && /analysis\.yaml/.test(e.message) && /pie/.test(e.message));
+  await fs.writeFile(path.join(dir, "analysis.yaml"), "views: [\n");
+  await assert.rejects(loadAnalysis(dir), (e: unknown) => e instanceof ConfigFileError && /analysis\.yaml/.test(e.message));
+});
+
+test("examples/analysis.example.yaml parses", async () => {
+  await fs.copyFile(path.join(examples, "analysis.example.yaml"), path.join(dir, "analysis.yaml"));
+  const a = (await loadAnalysis(dir))!;
+  assert.ok(Object.keys(a.groups).length > 0);
+  assert.ok(Object.keys(a.views).length > 0);
 });

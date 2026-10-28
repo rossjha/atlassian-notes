@@ -103,6 +103,8 @@ test("GET /api/config returns the 3 example views, columns and jira url", async 
   assert.equal(body.error, null);
   assert.equal(body.jiraBaseUrl, "https://acme.example");
   assert.equal(body.defaultProject, "PAY");
+  assert.equal(body.analysis, null);
+  assert.equal(body.analysisError, null);
   assert.ok(body.columns.custom.category);
   assert.equal(res.headers.get("cache-control"), "no-store");
   assert.deepEqual(body.links, []); // no links.yaml yet
@@ -676,4 +678,18 @@ test("PUT /api/reading/<id>/note with baseBody survives a field change made whil
   assert.equal(after.note, "typed");
   assert.equal(after.status, "Complete");
   assert.equal((await put(`/api/reading/${id}/note`, { body: "x", baseMtimeMs: null, baseBody: 5 })).status, 400);
+});
+
+test("GET /api/config serves analysis.yaml, and a broken one as analysisError without breaking views", async () => {
+  fs.writeFileSync(path.join(dir, "analysis.yaml"), "views:\n  current:\n    charts: [progress]\n");
+  let body = await (await fetch(base() + "/api/config")).json();
+  assert.deepEqual(body.analysis.views.current.charts, [{ type: "progress" }]);
+  assert.equal(body.analysisError, null);
+  fs.writeFileSync(path.join(dir, "analysis.yaml"), "views:\n  current:\n    charts: [pie]\n");
+  body = await (await fetch(base() + "/api/config")).json();
+  assert.equal(body.analysis, null);
+  assert.match(body.analysisError, /analysis\.yaml.*pie/s);
+  assert.equal(body.error, null, "views.yaml still loads");
+  assert.ok(Array.isArray(body.views));
+  fs.rmSync(path.join(dir, "analysis.yaml"));
 });

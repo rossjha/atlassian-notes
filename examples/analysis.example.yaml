@@ -1,0 +1,40 @@
+# Optional: charts for each view's Analysis side. Copy to your notes folder as analysis.yaml.
+# Views not listed here get a default set. Component names below are made up: use your own.
+
+settings:
+  measure: points          # points | tickets
+  movingDays: 2            # in progress and updated within this many days = moving
+  stalledDays: 3           # in progress and not updated for more than this = stalled
+  lowLoad: 3               # open work per person below this is flagged low
+  freeze: W2/D3            # release freeze: week 2, working day 3 of the sprint (leave out if none)
+  blocked:
+    statuses: [Blocked]    # status names that mean blocked
+    # flagField: customfield_00000   # Jira's "Flagged" field id, if you use the flag
+    links: true            # an "is blocked by" link to a ticket that isn't done
+  # fields: [customfield_00000]      # extra Jira fields to fetch, for `by: field:<id>`
+
+groups:
+  product:
+    Payments: [payments-api, payments UI, infra]
+    Notifications: ["notify-*"]
+  layer:
+    Frontend: ["* UI"]
+    Backend: ["*-api", infra]
+
+views:
+  current:
+    settings: { lowLoad: 5 }
+    charts:
+      - countdown
+      - headlines
+      - progress
+      - perPerson
+      - attention
+      - { type: donut, by: group:product, title: Split by product }
+      - { type: statusBars, by: group:layer, title: Frontend vs backend }
+  backlog:
+    charts:
+      - complete
+      - { type: statusBars, by: group:layer, title: Frontend vs backend }
+      - { type: bars, by: component }
+      - { type: completeBy, by: group:product }
