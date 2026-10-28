@@ -49,6 +49,8 @@ export interface AnalysisConfig {
 
 export type Drill =
   | { kind: "value"; by: ByKey; value: string; label: string }
+  /** A person's open (not done) tickets, as the per-person chart counts them; "Unassigned" for none. */
+  | { kind: "person"; value: string; label: string }
   | { kind: "blocked" | "stalled" | "moving" | "done" | "unassigned"; label: string };
 
 export const OTHER = "Other";
@@ -178,8 +180,9 @@ function defaultCharts(hasSprint: boolean): ChartSpec[] {
 /** The settings and charts for a view: its analysis.yaml entry, else the default set. */
 export function chartsFor(cfg: AnalysisConfig | null, viewId: string, hasSprint: boolean): { settings: AnalysisSettings; charts: ChartSpec[] } {
   const v = cfg && Object.hasOwn(cfg.views, viewId) ? cfg.views[viewId]! : null;
-  if (v) return v;
-  return { settings: cfg?.settings ?? DEFAULT_SETTINGS, charts: defaultCharts(hasSprint) };
+  if (!v) return { settings: cfg?.settings ?? DEFAULT_SETTINGS, charts: defaultCharts(hasSprint) };
+  // The countdown only shows when the view's tickets share an active sprint with dates.
+  return hasSprint ? v : { settings: v.settings, charts: v.charts.filter((c) => c.type !== "countdown") };
 }
 
 // ---------- membership ----------
@@ -234,7 +237,7 @@ export function blockedReasons(row: Row, s: AnalysisSettings): string[] {
   if (categoryOf(t) === "done") return [];
   const out: string[] = [];
   if (s.blocked.statuses.some((st) => st.toLowerCase() === t.status.toLowerCase())) out.push(`status ${t.status}`);
-  if (t.flagged) out.push("flagged");
+  if (s.blocked.flagField && t.flagged) out.push("flagged");
   if (s.blocked.links) {
     for (const l of t.links ?? []) {
       if (l.direction === "inward" && l.type.toLowerCase() === "is blocked by" && l.done !== true) out.push(`blocked by ${l.key}`);
@@ -376,6 +379,8 @@ export interface SprintPosition {
   freezePassed: boolean;
   ended: boolean;
   notStarted: boolean;
+  /** Today falls within the sprint (week/day are only meaningful then). */
+  inSprint: boolean;
 }
 
 /** Where today falls in the sprint, in working days (Mon–Fri). On a weekend, today is the last working day before it. */
@@ -388,7 +393,7 @@ export function sprintPosition(sp: SprintRef, freeze: { week: number; day: numbe
   while (!isWeekday(today)) today = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
   const notStarted = localDay(now) < localDay(sp.start);
   const ended = localDay(now) > sp.end;
-  const idx = workdays.findIndex((d) => d.getTime() === today.getTime());
+  const idx = notStarted || ended ? -1 : workdays.findIndex((d) => d.getTime() === today.getTime());
   const freezeIdx = freeze ? (freeze.week - 1) * 5 + (freeze.day - 1) : -1;
   const freezeDay = freezeIdx >= 0 && freezeIdx < workdays.length ? workdays[freezeIdx]! : null;
   const pos = idx >= 0 ? idx : notStarted ? 0 : Math.max(workdays.length - 1, 0);
@@ -407,6 +412,7 @@ export function sprintPosition(sp: SprintRef, freeze: { week: number; day: numbe
     freezePassed,
     ended,
     notStarted,
+    inSprint: idx >= 0,
   };
 }
 
@@ -416,6 +422,7 @@ export function sprintPosition(sp: SprintRef, freeze: { week: number; day: numbe
 export function drillRows(rows: Row[], d: Drill, cfg: AnalysisConfig, s: AnalysisSettings, now: Date): Row[] {
   switch (d.kind) {
     case "value": return rows.filter((r) => valuesOf(r, d.by, cfg).includes(d.value));
+    case "person": return rows.filter((r) => (r.ticket.assignee || UNASSIGNED) === d.value && categoryOf(r.ticket) !== "done");
     case "blocked": return rows.filter((r) => isBlocked(r, s));
     case "stalled": return rows.filter((r) => isStalled(r, s, now));
     case "moving": return rows.filter((r) => isMoving(r, s, now));

@@ -99,6 +99,7 @@ function countdownCard(rows: Row[], s: AnalysisSettings, now: Date): HTMLElement
   const sp = sprintOf(rows);
   if (!sp) return card("an-s12", "Sprint", null, note("No active sprint with dates in this view."));
   const p = sprintPosition(sp, s.freeze, now);
+  const short = (d: Date) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
   const strip = h("div", { class: "an-days" });
   const labels = h("div", { class: "an-days an-days-labels" });
   const dayName = (d: Date) => "SMTWTFS"[d.getDay()]!;
@@ -113,8 +114,11 @@ function countdownCard(rows: Row[], s: AnalysisSettings, now: Date): HTMLElement
     : p.freezePassed ? h("div", { class: "an-kpi an-flag" }, "Freeze passed", h("small", {}, ` W${s.freeze.week}/D${s.freeze.day}`))
     : p.toFreeze !== null ? h("div", { class: "an-kpi an-flag" }, h("span", { class: "an-count" }, String(p.toFreeze)), h("small", {}, ` working ${p.toFreeze === 1 ? "day" : "days"} to freeze (W${s.freeze.week}/D${s.freeze.day})`))
     : null;
+  const where = p.inSprint
+    ? h("div", { class: "an-kpi" }, `W${p.week}/D${p.day}`, h("small", {}, ` today · ${sp.name}`))
+    : h("div", { class: "an-kpi" }, p.notStarted ? `Starts ${short(sp.start)}` : "Ended", h("small", {}, ` · ${sp.name}`));
   return h("section", { class: "an-card an-s12 an-countdown" },
-    h("div", { class: "an-kpi" }, `W${p.week}/D${p.day}`, h("small", {}, ` today · ${sp.name}`)),
+    where,
     h("div", { class: "an-days-wrap" }, strip, labels),
     freeze,
     h("div", { class: "an-kpi" }, status, h("small", {}, ` · ends ${end}`)),
@@ -287,7 +291,7 @@ function perPersonCard(rows: Row[], s: AnalysisSettings, onDrill: (d: Drill) => 
     grow(fill, max > 0 ? p.open / max : 0);
     const label = `${p.name}${p.low ? " ↓ low" : ""}`;
     list.append(
-      rowButton(label, { kind: "value", by: "assignee", value: p.name, label: `Assignee: ${p.name}` }, onDrill, p.low ? "an-low" : p.name === UNASSIGNED ? "an-muted" : ""),
+      rowButton(label, { kind: "person", value: p.name, label: `Open work: ${p.name}` }, onDrill, p.low ? "an-low" : p.name === UNASSIGNED ? "an-muted" : ""),
       h("div", { class: "an-bar" }, fill),
       h("span", { class: `an-n${p.low ? " an-low" : ""}` }, `${fmt(p.open)}${p.unestimated ? ` +${p.unestimated}?` : ""}`),
     );

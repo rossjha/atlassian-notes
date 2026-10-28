@@ -972,8 +972,11 @@ function renderBody(): void {
   let shown = applyFilters(base, view.filters);
   const locked = viewsLocked();
   const drillChip = drill ? { label: drill.d.label, onClear: () => { drill = null; renderBody(); } } : undefined;
-  if (locked) filterEl.replaceChildren();
-  else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged, drillChip);
+  if (locked) {
+    // Filters can't be edited while a config file is broken, but a drill-down must still say it's narrowing the table.
+    filterEl.replaceChildren(...(drillChip ? [h("span", { class: "fb-drill" }, `From analysis · ${drillChip.label}`,
+      h("button", { type: "button", "aria-label": "Clear the analysis drill-down", onclick: drillChip.onClear }, "×"))] : []));
+  } else renderFilterBar(filterEl, view, columns, { shown: shown.length, total: rows.length, loaded: rowsLoaded }, onFiltersChanged, drillChip);
   if (sort) shown = sortRows(shown, sort.columnId, sort.dir);
   renderTable(tableEl, view, shown, columns, locked ? { ...tableHandlers, onToggleDisplay: undefined, onResizeColumn: undefined, onMoveColumn: undefined } : tableHandlers, sort);
 }

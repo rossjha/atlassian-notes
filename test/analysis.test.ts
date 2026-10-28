@@ -236,3 +236,40 @@ test("drillRows returns exactly the chart's members", () => {
   assert.deepEqual(keys(drillRows(rows, { kind: "done", label: "" }, cfg, S, NOW)), ["A-1"]);
   assert.deepEqual(keys(drillRows(rows, { kind: "unassigned", label: "" }, cfg, S, NOW)), ["A-2", "A-3"]);
 });
+
+test("review: clicking a person drills to their open tickets only, matching perPerson", () => {
+  const rows = [
+    row("A-1", { assignee: "Sam", storyPoints: 2, ...ip }),
+    row("A-2", { assignee: "Sam", storyPoints: 5, ...done }),
+    row("A-3", { storyPoints: 1 }),
+    row("A-4", { storyPoints: 3, ...done }),
+  ];
+  const keys = (rs: Row[]) => rs.map((r) => r.ticket.key);
+  assert.deepEqual(keys(drillRows(rows, { kind: "person", value: "Sam", label: "" }, cfg, S, NOW)), ["A-1"]);
+  assert.deepEqual(keys(drillRows(rows, { kind: "person", value: "Unassigned", label: "" }, cfg, S, NOW)), ["A-3"]);
+  const sam = perPerson(rows, { ...S, measure: "tickets" }).find((p) => p.name === "Sam")!;
+  assert.equal(sam.open, 1);
+});
+
+test("review: the flag only blocks while flagField is set", () => {
+  assert.deepEqual(blockedReasons(row("A-1", { flagged: true }), { ...S, blocked: { ...S.blocked, flagField: null } }), []);
+});
+
+test("review: countdown is dropped without a sprint, even when listed", () => {
+  const c = parseAnalysisConfig({ views: { v: { charts: ["countdown", "progress"] }, w: {} } });
+  assert.deepEqual(chartsFor(c, "v", false).charts, [{ type: "progress" }]);
+  assert.deepEqual(chartsFor(c, "v", true).charts.map((x) => x.type), ["countdown", "progress"]);
+  assert.equal(chartsFor(c, "w", false).charts[0]!.type, "headlines");
+});
+
+test("review: no 'today' outside the sprint", () => {
+  const sp = { name: "S42", start: new Date(2026, 9, 26), end: new Date(2026, 10, 6) };
+  const before = sprintPosition(sp, null, new Date(2026, 9, 20));
+  assert.equal(before.days.some((d) => d.today), false);
+  assert.equal(before.inSprint, false);
+  const afterWeekend = sprintPosition(sp, null, new Date(2026, 10, 7, 10)); // Sat after a Fri end
+  assert.ok(afterWeekend.ended);
+  assert.equal(afterWeekend.days.some((d) => d.today), false);
+  assert.equal(afterWeekend.inSprint, false);
+  assert.equal(sprintPosition(sp, null, NOW).inSprint, true);
+});
