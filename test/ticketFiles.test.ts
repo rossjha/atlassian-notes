@@ -334,3 +334,14 @@ test("syncTicketFiles writes Reading lines from getReadingIndex", async () => {
   await syncTicketFiles({ ...deps(), getReadingIndex: async () => new Map([["AAA-1", [rs("2026-10-25-a", "Runbook")]]]) });
   assert.ok((await fs.readFile(tpath("AAA-1"), "utf8")).includes("- Reading: [[reading/items/2026-10-25-a|Runbook]]"));
 });
+
+test("jira columns become properties; a reserved name gets a jira_ prefix", () => {
+  const t = ticket("AAA-7", { extra: { customfield_00001: "1.2", customfield_00002: "x" } });
+  const out = renderTicketFile(t, {
+    ...noCtx,
+    jiraColumns: { release: { label: "T", field: "customfield_00001" }, status: { label: "S", field: "customfield_00002" }, gone: { label: "G", field: "customfield_00003" } },
+  });
+  assert.match(out, /^release: "?1\.2"?$/m);
+  assert.match(out, /^jira_status: x$/m);
+  assert.doesNotMatch(out, /^gone:/m);
+});

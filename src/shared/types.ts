@@ -72,9 +72,13 @@ export type CustomColumnDef =
   | { label: string; type: "select"; options: Record<string, string> }
   | { label: string; type: "text" };
 
+/** A read-only table column showing a Jira field (columns.yaml `jiraColumns`). */
+export interface JiraColumnDef { label: string; field: string }
+
 export interface ColumnsConfig {
   jiraFields: { storyPoints: string | null; sprint: string; acceptanceCriteria: string | null };
   custom: Record<string, CustomColumnDef>;
+  jiraColumns: Record<string, JiraColumnDef>;
   groomPrompt: string;
 }
 
@@ -122,6 +126,8 @@ export interface Row {
   note: { body: string; mtimeMs: number } | null;
   groom: GroomSummary | null;
   custom: Record<string, string>;
+  /** Jira column values by column id (columns.yaml `jiraColumns`); empty values are left out. */
+  jira?: Record<string, string>;
   flags: { jiraNewerThanNote: boolean; jiraNewerThanGroom: boolean };
 }
 

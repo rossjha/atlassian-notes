@@ -13,6 +13,11 @@ custom:
   ownerGuess:
     label: Owner guess
     type: text
+# Read-only columns showing other Jira fields; add the id to a view's columns. Chart with `by: column:<id>`.
+# jiraColumns:
+#   release:
+#     label: Release
+#     field: customfield_00000
 # Text for "Copy groom prompt"; {key}, {url} and {groomPath} are filled in per ticket.
 # The default names the author's own groom-work-item skill: change it to yours.
 # groomPrompt: "Run my-groom-skill on {key} ({url}). Save the result to {groomPath} with front matter: readiness, summary, groomed_at (ISO)."

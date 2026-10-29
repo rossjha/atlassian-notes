@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { CustomColumnDef, ReadingSummary, Ticket } from "../shared/types.ts";
+import type { CustomColumnDef, JiraColumnDef, ReadingSummary, Ticket } from "../shared/types.ts";
 import { BOARD_CACHE_ID } from "./boardService.ts";
 import type { ViewCache } from "./cache.ts";
 import { isValidKey, stringifyFrontMatter } from "./frontMatter.ts";
@@ -17,6 +17,8 @@ export interface TicketFileContext {
   note: { data: Record<string, unknown>; parseError: string | null } | null;
   hasGroom: boolean;
   custom: Record<string, CustomColumnDef>;
+  /** columns.yaml `jiraColumns`: each becomes a property holding the ticket's value. */
+  jiraColumns?: Record<string, JiraColumnDef>;
   /** Reading list items that link this ticket. */
   reading?: ReadingSummary[];
 }
@@ -52,6 +54,11 @@ export function renderTicketFile(t: Ticket, ctx: TicketFileContext): string {
         if (col && slug) tags.push(`${col}/${slug}`);
       }
     }
+  }
+
+  for (const [id, def] of Object.entries(ctx.jiraColumns ?? {})) {
+    const value = t.extra?.[def.field];
+    if (typeof value === "string" && value !== "") customProps[RESERVED_PROPS.includes(id) ? `jira_${id}` : id] = value;
   }
 
   const candidates: Record<string, unknown> = {
@@ -94,6 +101,7 @@ export async function syncTicketFiles(deps: {
   cache: ViewCache;
   notes: NotesStore;
   getCustom: () => Promise<Record<string, CustomColumnDef>>;
+  getJiraColumns?: () => Promise<Record<string, JiraColumnDef>>;
   getViewIds: () => Promise<string[]>;
   getReadingIndex?: () => Promise<Map<string, ReadingSummary[]>>;
 }): Promise<{ written: number; deleted: number }> {
@@ -101,6 +109,7 @@ export async function syncTicketFiles(deps: {
   const ids = [...(await deps.getViewIds()), BOARD_CACHE_ID];
   const { tickets, cacheFiles } = await deps.cache.allCachedTickets(ids);
   const custom = await deps.getCustom();
+  const jiraColumns = deps.getJiraColumns ? await deps.getJiraColumns() : {};
   const readingIndex = deps.getReadingIndex ? await deps.getReadingIndex() : new Map<string, ReadingSummary[]>();
   const dir = path.join(path.resolve(deps.notesDir), TICKETS_DIR);
   let written = 0;
@@ -116,6 +125,7 @@ export async function syncTicketFiles(deps: {
       note: note ? { data: note.data, parseError: note.parseError } : null,
       hasGroom: groom !== null,
       custom,
+      jiraColumns,
       reading: readingIndex.get(key) ?? [],
     });
     const file = path.join(dir, `${key}.md`);

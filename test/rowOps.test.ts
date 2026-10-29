@@ -96,3 +96,14 @@ test("sortRows by noteUpdated desc puts newest first and no-note rows last", () 
   assert.deepEqual(keys(sortRows(rows, "noteUpdated", "desc")), ["A-3", "A-4", "A-2", "A-1"]);
   assert.deepEqual(keys(sortRows(rows, "noteUpdated", "asc")), ["A-2", "A-4", "A-3", "A-1"]);
 });
+
+test("jira columns: cellValue, contains filter and sort read row.jira", () => {
+  const a = { ...row("A-1"), jira: { release: "2.0" } };
+  const b = { ...row("A-2"), jira: { release: "1.5" } };
+  const c = row("A-3");
+  assert.equal(cellValue(a, "release"), "2.0");
+  assert.equal(cellValue(c, "release"), null);
+  assert.deepEqual(keys(applyFilters([a, b, c], { release: { op: "contains", text: "1." } })), ["A-2"]);
+  assert.deepEqual(keys(applyFilters([a, b, c], { release: { op: "empty" } })), ["A-3"]);
+  assert.deepEqual(keys(sortRows([a, b, c], "release", "asc")), ["A-2", "A-1", "A-3"]);
+});

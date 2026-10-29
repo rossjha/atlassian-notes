@@ -23,7 +23,7 @@ export interface SortState {
 }
 
 function label(id: string, columns: ColumnsConfig): string {
-  return BUILTIN_COLUMNS.find((c) => c.id === id)?.label ?? columns.custom[id]?.label ?? id;
+  return BUILTIN_COLUMNS.find((c) => c.id === id)?.label ?? columns.custom[id]?.label ?? columns.jiraColumns[id]?.label ?? id;
 }
 
 function starCell(key: string, star: NonNullable<TableHandlers["star"]>): HTMLElement {

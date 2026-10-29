@@ -246,3 +246,31 @@ test("examples/analysis.example.yaml parses", async () => {
   assert.ok(Object.keys(a.groups).length > 0);
   assert.ok(Object.keys(a.views).length > 0);
 });
+
+test("jiraColumns: parsed, and usable as view columns and filters", async () => {
+  await fs.writeFile(path.join(dir, "columns.yaml"),
+    "custom:\n  category:\n    label: Category\n    type: text\njiraColumns:\n  release:\n    label: Release\n    field: customfield_00001\n");
+  const columns = await loadColumns(dir);
+  assert.deepEqual(columns.jiraColumns, { release: { label: "Release", field: "customfield_00001" } });
+  await fs.writeFile(path.join(dir, "views.yaml"),
+    "views:\n  - {id: a, name: A, jql: x, columns: [{id: key}, {id: release}], filters: {release: {op: contains, text: '1.2'}}}\n");
+  const views = await loadViews(dir, columns);
+  assert.deepEqual(views[0].columns, [{ id: "key" }, { id: "release" }]);
+  assert.deepEqual(views[0].filters, { release: { op: "contains", text: "1.2" } });
+});
+
+test("jiraColumns: missing file section is empty; bad entries and clashes reject", async () => {
+  await fs.writeFile(path.join(dir, "columns.yaml"), "custom: {}\n");
+  assert.deepEqual((await loadColumns(dir)).jiraColumns, {});
+  for (const bad of [
+    "jiraColumns: [x]\n",
+    "jiraColumns:\n  tf:\n    label: T\n",
+    "jiraColumns:\n  tf:\n    field: customfield_1\n",
+    "jiraColumns:\n  status:\n    label: S\n    field: customfield_1\n",
+    "custom:\n  tf:\n    label: T\n    type: text\njiraColumns:\n  tf:\n    label: T\n    field: customfield_1\n",
+    "jiraColumns:\n  __proto__:\n    label: T\n    field: customfield_1\n",
+  ]) {
+    await fs.writeFile(path.join(dir, "columns.yaml"), bad);
+    await assert.rejects(loadColumns(dir), ConfigFileError, bad);
+  }
+});

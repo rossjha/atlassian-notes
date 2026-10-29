@@ -53,6 +53,7 @@ const MIME: Record<string, string> = {
 const FALLBACK_COLUMNS: ColumnsConfig = {
   jiraFields: { storyPoints: null, sprint: "customfield_10020", acceptanceCriteria: null },
   custom: {},
+  jiraColumns: {},
   groomPrompt: "",
 };
 
@@ -128,7 +129,7 @@ export function createApp(deps: AppDeps): { server: http.Server; broadcast: (e: 
     const groomBy = new Map(grooms.map((g) => [g.key, g]));
     const customIds = Object.keys(columns.custom);
     const rows: Row[] = cached.tickets.map((t) =>
-      buildRow(t, noteBy.get(t.key) ?? null, groomBy.get(t.key) ?? null, customIds),
+      buildRow(t, noteBy.get(t.key) ?? null, groomBy.get(t.key) ?? null, customIds, columns.jiraColumns),
     );
     return { rows, fetchedAt: cached.fetchedAt, error: cached.error };
   }

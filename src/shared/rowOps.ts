@@ -23,7 +23,7 @@ export function cellValue(row: Row, columnId: string): string | number | null {
       const ms = row.groom?.groomedAt ? Date.parse(row.groom.groomedAt) : NaN;
       return Number.isNaN(ms) ? null : ms;
     }
-    default: return row.custom[columnId] ?? null;
+    default: return row.custom[columnId] ?? row.jira?.[columnId] ?? null;
   }
 }
 

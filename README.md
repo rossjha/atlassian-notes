@@ -30,7 +30,7 @@ Everything personal lives in `NOTES_DIR` (default `~/atlassian-notes-data`), nev
 ```
 views.yaml            tabs: name, JQL, columns, filters
 board.yaml            your personal board: columns and card placement
-columns.yaml          custom columns + Jira field mapping
+columns.yaml          custom columns, Jira columns + Jira field mapping
 jira/notes/KEY.md     your notes
 jira/groom/KEY.md     groom output written by Claude (the app only reads it)
 jira/tickets/KEY.md   generated ticket files for Obsidian (generated; edits are overwritten)
@@ -74,6 +74,14 @@ custom:
 
 Optional keys:
 
+- `jiraColumns`: extra Jira fields shown as read-only table columns. Each entry has an id (what you put in a view's `columns`), a `label` and the Jira `field` id:
+  ```yaml
+  jiraColumns:
+    release:
+      label: Release
+      field: customfield_12345
+  ```
+  After ⟳ the value appears in the table (several values comma-separated), can be sorted, filtered with contains / is empty / is not empty, charted in Analysis with `by: column:release`, and is written as a property on each ticket's file in `jira/tickets/` (as `jira_<id>` if the id is a reserved property name). The id can't match a built-in or `custom` column.
 - `jiraFields.acceptanceCriteria`: the `customfield_NNNNN` holding acceptance criteria, if your site has one. It is shown in the ticket drawer and included when you copy the ticket.
 - `groomPrompt`: the text that Copy → "Groom prompt for Claude" copies. Placeholders `{key}`, `{url}` and `{groomPath}` are filled in per ticket. The default asks for a skill called `groom-work-item` (the author's own); change it to name your own grooming skill or prompt.
 
@@ -101,7 +109,7 @@ Charts come from an optional `analysis.yaml` in your notes folder; copy `example
 | `perPerson` | open work per assignee, with anyone under `lowLoad` marked low |
 | `attention` | blocked tickets (and why), then stalled ones |
 
-`by` is `assignee`, `status`, `type`, `priority`, `component`, `label`, `group:<set>`, `column:<your column id>` or `field:<jira field id>` (listed in `fields`).
+`by` is `assignee`, `status`, `type`, `priority`, `component`, `label`, `group:<set>`, `column:<your column id>` (a `custom` or `jiraColumns` column) or `field:<jira field id>` (listed in `fields`).
 
 - **Stalled:** in progress, not blocked, and not updated for more than `stalledDays`. **Moving:** in progress, not blocked, updated within `movingDays`. **Blocked:** not done, and in a `blocked.statuses` status, flagged in Jira (when `flagField` is set), or with an "is blocked by" link to a ticket that isn't done.
 - Working days are Monday to Friday. Sprint dates, the flag and extra fields arrive with the next refresh after you add them.

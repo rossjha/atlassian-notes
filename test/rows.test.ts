@@ -36,3 +36,9 @@ test("custom.category is read from note front matter; null/absent omitted", () =
   const r = buildRow(ticket, note(0, { category: "bug", other: null, n: 3 }), null, ["category", "other", "missing", "n"]);
   assert.deepEqual(r.custom, { category: "bug", n: "3" });
 });
+
+test("jira column values come from the ticket's fetched fields", () => {
+  const t = { ...ticket, extra: { customfield_00001: "1.2, 1.3" } };
+  const r = buildRow(t, null, null, [], { release: { label: "T", field: "customfield_00001" }, other: { label: "O", field: "customfield_00009" } });
+  assert.deepEqual(r.jira, { release: "1.2, 1.3" });
+});

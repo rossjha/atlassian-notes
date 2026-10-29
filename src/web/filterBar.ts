@@ -41,8 +41,11 @@ export function renderFilterBar(
 ): void {
   const draw = (): void => renderFilterBar(container, view, columns, totals, onChange, drill);
   rerender = draw;
-  const custom = Object.entries(columns.custom);
-  const activeEntries = Object.entries(view.filters).filter(([id, f]) => columns.custom[id] && isActive(f));
+  // Jira columns are read-only text: they filter by contains / empty / not empty.
+  const defs: Record<string, CustomColumnDef> = { ...columns.custom };
+  for (const [id, def] of Object.entries(columns.jiraColumns)) defs[id] = { label: def.label, type: "text" };
+  const custom = Object.entries(defs);
+  const activeEntries = Object.entries(view.filters).filter(([id, f]) => defs[id] && isActive(f));
 
   const change = (id: string, next: FilterValue | null): void => {
     const filters: Filters = { ...view.filters };
@@ -97,7 +100,7 @@ export function renderFilterBar(
   };
 
   const chips = activeEntries.map(([id, f]) => {
-    const def = columns.custom[id]!;
+    const def = defs[id]!;
     return h("span", { class: "fb-wrap", "data-fb-keep": "" },
       h("span", { class: "fb-chip" },
         h("button", { type: "button", class: "fb-chip-label", "aria-label": `Edit ${def.label} filter`, onclick: () => toggle(id) },
@@ -123,7 +126,7 @@ export function renderFilterBar(
   if (custom.length === 0) addBtn.setAttribute("disabled", "");
 
   // A column popover opened from the menu has no chip yet; anchor it to the Add filter button.
-  const pendingCol = openPop && openPop !== "add" && !activeEntries.some(([id]) => id === openPop) ? columns.custom[openPop] : undefined;
+  const pendingCol = openPop && openPop !== "add" && !activeEntries.some(([id]) => id === openPop) ? defs[openPop] : undefined;
   const adder = h("span", { class: "fb-wrap", "data-fb-keep": "" }, addBtn, menu, pendingCol ? popover(openPop!, pendingCol) : null);
 
   const clear = h("button", { type: "button", class: "link-btn", onclick: () => {

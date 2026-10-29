@@ -57,15 +57,20 @@ async function main(): Promise<void> {
   await reloadAnalysisFetch();
   const analysisFields = { extraFields: () => analysisFetch.fields, flagField: () => analysisFetch.flagField };
 
-  const makeClient = async (): Promise<JiraClient> =>
-    createJiraClient({
+  const makeClient = async (): Promise<JiraClient> => {
+    const columns = await loadColumns(config.notesDir);
+    // columns.yaml's Jira columns are fetched alongside analysis.yaml's fields (the client is rebuilt when columns.yaml changes).
+    const columnFields = Object.values(columns.jiraColumns).map((c) => c.field);
+    return createJiraClient({
       apiBase: config.jiraApiBase,
       siteUrl: config.jiraBaseUrl,
       email: config.jiraEmail,
       token: config.jiraApiToken,
-      fields: (await loadColumns(config.notesDir)).jiraFields,
+      fields: columns.jiraFields,
       ...analysisFields,
+      extraFields: () => [...new Set([...analysisFetch.fields, ...columnFields])],
     });
+  };
 
   // Field mapping lives in columns.yaml, so the real client is rebuilt when that file changes.
   let inner: JiraClient;
@@ -127,6 +132,7 @@ async function main(): Promise<void> {
       cache,
       notes,
       getCustom: async () => (await loadColumns(config.notesDir)).custom,
+      getJiraColumns: async () => (await loadColumns(config.notesDir)).jiraColumns,
       getReadingIndex: () => reading.ticketIndex(),
       getViewIds: async () =>
         (await loadViews(config.notesDir, await loadColumns(config.notesDir))).map((v) => v.id),

@@ -273,3 +273,16 @@ test("review: no 'today' outside the sprint", () => {
   assert.equal(afterWeekend.inSprint, false);
   assert.equal(sprintPosition(sp, null, NOW).inSprint, true);
 });
+
+test("valuesOf: column:<id> reads a Jira column too", () => {
+  const r = { ...row("A-1"), jira: { release: "1.2" } };
+  assert.deepEqual(valuesOf(r, "column:release", cfg), ["1.2"]);
+  assert.deepEqual(valuesOf(row("A-2"), "column:release", cfg), ["(none)"]);
+});
+
+test("valuesOf: a multi-value Jira column or field counts under each value", () => {
+  const r = { ...row("A-1", { extra: { customfield_00002: "1.2, 1.3" } }), jira: { release: "1.2, 1.3" } };
+  assert.deepEqual(valuesOf(r, "column:release", cfg), ["1.2", "1.3"]);
+  assert.deepEqual(valuesOf(r, "field:customfield_00002", cfg), ["1.2", "1.3"]);
+  assert.deepEqual(valuesOf({ ...row("A-2"), custom: { category: "a, b" } }, "column:category", cfg), ["a, b"], "your own columns are single values");
+});

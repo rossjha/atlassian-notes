@@ -46,7 +46,7 @@ function grow(el: HTMLElement | SVGElement, frac: number, prop = "width"): void 
 
 function byLabel(by: string, columns: ColumnsConfig): string {
   if (by.startsWith("group:")) return by.slice(6);
-  if (by.startsWith("column:")) return columns.custom[by.slice(7)]?.label ?? by.slice(7);
+  if (by.startsWith("column:")) return columns.custom[by.slice(7)]?.label ?? columns.jiraColumns[by.slice(7)]?.label ?? by.slice(7);
   if (by.startsWith("field:")) return by.slice(6);
   return by;
 }

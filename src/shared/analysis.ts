@@ -218,8 +218,10 @@ export function valuesOf(row: Row, by: ByKey, cfg: AnalysisConfig): string[] {
     case "label": return orNone(t.labels);
   }
   const [kind, id] = [by.slice(0, by.indexOf(":")), by.slice(by.indexOf(":") + 1)];
-  if (kind === "column") return orNone([row.custom[id]]);
-  if (kind === "field") return orNone([t.extra?.[id]]);
+  // Jira values with several entries (versions, multi-selects) arrive joined with ", "; each counts on its own.
+  const many = (v: string | null | undefined): string[] => (v ? v.split(", ") : []);
+  if (kind === "column") return row.custom[id] !== undefined ? orNone([row.custom[id]]) : orNone(many(row.jira?.[id]));
+  if (kind === "field") return orNone(many(t.extra?.[id]));
   const set = cfg.groups[id] ?? {};
   const comps = t.components ?? [];
   const hits = Object.entries(set).filter(([, pats]) => comps.some((c) => pats.some((p) => componentMatches(p, c)))).map(([name]) => name);

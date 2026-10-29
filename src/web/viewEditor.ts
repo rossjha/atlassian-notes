@@ -19,17 +19,17 @@ export function uniqueViewId(name: string, taken: Iterable<string>): string {
 }
 
 function columnLabel(id: string, columns: ColumnsConfig): string {
-  return BUILTIN_COLUMNS.find((c) => c.id === id)?.label ?? columns.custom[id]?.label ?? id;
+  return BUILTIN_COLUMNS.find((c) => c.id === id)?.label ?? columns.custom[id]?.label ?? columns.jiraColumns[id]?.label ?? id;
 }
 
 /** The view's own column order, then any builtin/custom columns it doesn't mention (hidden unless new view). */
 function initialColumns(view: View | null, columns: ColumnsConfig): ColumnSetting[] {
   const out: ColumnSetting[] = view ? view.columns.map((c) => ({ ...c })) : [];
   const have = new Set(out.map((c) => c.id));
-  const all = [...BUILTIN_COLUMNS.map((c) => c.id), ...Object.keys(columns.custom)];
+  const all = [...BUILTIN_COLUMNS.map((c) => c.id), ...Object.keys(columns.custom), ...Object.keys(columns.jiraColumns)];
   for (const id of all) {
     if (have.has(id)) continue;
-    const shown = view === null && (DEFAULT_SHOWN.has(id) || id in columns.custom);
+    const shown = view === null && (DEFAULT_SHOWN.has(id) || id in columns.custom || id in columns.jiraColumns);
     out.push(shown ? { id } : { id, hidden: true });
   }
   return out;

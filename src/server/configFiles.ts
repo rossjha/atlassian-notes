@@ -3,7 +3,7 @@ import { parseAnalysisConfig, type AnalysisConfig } from "../shared/analysis.ts"
 import path from "node:path";
 import YAML from "yaml";
 import { BUILTIN_COLUMNS } from "../shared/types.ts";
-import type { ColumnSetting, ColumnsConfig, CustomColumnDef, FilterValue, Filters, ReadingConfig, View } from "../shared/types.ts";
+import type { ColumnSetting, ColumnsConfig, CustomColumnDef, FilterValue, Filters, JiraColumnDef, ReadingConfig, View } from "../shared/types.ts";
 import { parseLinks, type NavLink } from "../shared/links.ts";
 import { atomicWrite } from "./notesStore.ts";
 
@@ -117,6 +117,17 @@ export async function loadColumns(notesDir: string): Promise<ColumnsConfig> {
       throw new ConfigFileError(file, `custom column "${id}" has type "${String(def.type)}"; use select or text`);
     }
   }
+  const jiraColumns: Record<string, JiraColumnDef> = {};
+  const rawJira = root.jiraColumns ?? {};
+  if (!isObj(rawJira)) throw new ConfigFileError(file, "jiraColumns must be a mapping");
+  for (const [id, def] of Object.entries(rawJira)) {
+    if (id === "__proto__") throw new ConfigFileError(file, `Jira column id "__proto__" is not allowed`);
+    if (BUILTIN_IDS.has(id)) throw new ConfigFileError(file, `Jira column "${id}" clashes with a built-in column`);
+    if (Object.hasOwn(custom, id)) throw new ConfigFileError(file, `Jira column "${id}" clashes with the custom column of the same id`);
+    if (!isObj(def) || typeof def.label !== "string") throw new ConfigFileError(file, `Jira column "${id}" needs a label`);
+    if (typeof def.field !== "string" || def.field.trim() === "") throw new ConfigFileError(file, `Jira column "${id}" needs a field (the Jira field id, e.g. customfield_10123)`);
+    jiraColumns[id] = { label: def.label, field: def.field.trim() };
+  }
   return {
     jiraFields: {
       storyPoints: strOrNull(file, jf.storyPoints, "jiraFields.storyPoints") ?? null,
@@ -124,6 +135,7 @@ export async function loadColumns(notesDir: string): Promise<ColumnsConfig> {
       acceptanceCriteria: strOrNull(file, jf.acceptanceCriteria, "jiraFields.acceptanceCriteria") ?? null,
     },
     custom,
+    jiraColumns,
     groomPrompt: strOrNull(file, root.groomPrompt, "groomPrompt") ?? DEFAULT_GROOM_PROMPT,
   };
 }
@@ -188,7 +200,7 @@ export function validateViews(
     for (const rc of Array.isArray(rv.columns) ? rv.columns : []) {
       const c: Obj = typeof rc === "string" ? { id: rc } : isObj(rc) ? rc : {};
       if (typeof c.id !== "string") throw new ConfigFileError(file, `view "${id}" has a column without an id`);
-      if (!BUILTIN_IDS.has(c.id) && !Object.hasOwn(columns.custom, c.id)) {
+      if (!BUILTIN_IDS.has(c.id) && !Object.hasOwn(columns.custom, c.id) && !Object.hasOwn(columns.jiraColumns, c.id)) {
         console.warn(`${file}: view "${id}" ignores unknown column "${c.id}"`);
         continue;
       }
@@ -207,7 +219,7 @@ export function validateViews(
     if (!isObj(rawFilters)) throw new ConfigFileError(file, `view "${id}" filters must be a mapping`);
     for (const [col, fv] of Object.entries(rawFilters)) {
       // A filter left behind by a renamed or removed custom column is dropped, like an unknown column above.
-      if (!Object.hasOwn(columns.custom, col)) {
+      if (!Object.hasOwn(columns.custom, col) && !Object.hasOwn(columns.jiraColumns, col)) {
         console.warn(`${file}: view "${id}" ignores filter on unknown column "${col}"`);
         continue;
       }
