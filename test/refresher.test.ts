@@ -229,3 +229,42 @@ test("refreshView searches with the view's keyword ANDed in", async () => {
   await r.refreshView(view);
   assert.deepEqual(seen, ['(project = PAY) AND text ~ "auth" ORDER BY rank', "project = PAY"]);
 });
+
+test("a view refresh updates the same tickets in other views' and the board's caches", async () => {
+  const other: View = { ...view, id: "other", name: "Other" };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-"));
+  const cache = new ViewCache(dir);
+  const events: LiveEvent[] = [];
+  const fresh = { ...t("100", "PAY-1"), components: [] } as Ticket;
+  const jira = { search: async () => [fresh], getIssueBrief: async () => null, getIssueDetail: async () => { throw new Error("unused"); } } as JiraClient;
+  const r = new Refresher({
+    jira, cache, notes: new NotesStore(dir), getViews: async () => [view, other], onChange: (e) => events.push(e),
+    statePath: path.join(dir, ".cache", "reconcile.json"), now: () => new Date("2026-10-24T10:00:00Z"),
+  });
+  const stale = { ...t("100", "PAY-1"), components: ["old"] } as Ticket;
+  await cache.write("other", { fetchedAt: "2026-10-20T00:00:00.000Z", tickets: [stale, t("101", "PAY-2")], error: null });
+  await cache.write("_board", { fetchedAt: "2026-10-20T00:00:00.000Z", tickets: [stale], error: null });
+
+  await r.refreshView(view);
+
+  const o = await cache.read("other");
+  assert.deepEqual(o.tickets.map((x) => [x.key, x.components]), [["PAY-1", []], ["PAY-2", undefined]]);
+  assert.equal(o.fetchedAt, "2026-10-20T00:00:00.000Z", "the other view keeps its own fetch time");
+  assert.deepEqual((await cache.read("_board")).tickets[0]!.components, []);
+  assert.deepEqual(events, [{ type: "rows", viewId: "current" }, { type: "rows", viewId: "other" }, { type: "board" }]);
+});
+
+test("a view refresh leaves other caches alone when nothing changed", async () => {
+  const other: View = { ...view, id: "other", name: "Other" };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "refresh-"));
+  const cache = new ViewCache(dir);
+  const events: LiveEvent[] = [];
+  const jira = { search: async () => [t("100", "PAY-1")], getIssueBrief: async () => null, getIssueDetail: async () => { throw new Error("unused"); } } as JiraClient;
+  const r = new Refresher({
+    jira, cache, notes: new NotesStore(dir), getViews: async () => [view, other], onChange: (e) => events.push(e),
+    statePath: path.join(dir, ".cache", "reconcile.json"),
+  });
+  await cache.write("other", { fetchedAt: null, tickets: [t("100", "PAY-1")], error: null });
+  await r.refreshView(view);
+  assert.deepEqual(events, [{ type: "rows", viewId: "current" }]);
+});

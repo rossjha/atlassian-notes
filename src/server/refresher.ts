@@ -5,6 +5,7 @@ import { JiraError, type JiraClient } from "./jira.ts";
 import type { NotesStore } from "./notesStore.ts";
 import { reconcile } from "./reconcile.ts";
 import type { TicketFileSyncer } from "./ticketFiles.ts";
+import { BOARD_CACHE_ID } from "./boardService.ts";
 
 export interface RefresherDeps {
   jira: JiraClient;
@@ -41,10 +42,12 @@ export class Refresher {
   async refreshView(view: View): Promise<CachedView> {
     const { jira, cache, notes, onChange } = this.deps;
     let result: CachedView;
+    let spread: string[] = [];
     try {
       const tickets = await jira.search(withKeyword(view.jql, view.search), view.limit);
       result = { fetchedAt: this.now().toISOString(), tickets, error: null };
       await cache.write(view.id, result);
+      spread = await this.spreadFresh(view.id, tickets);
       await this.ensureIdentities(tickets);
     } catch (e) {
       const messages = e instanceof JiraError ? e.messages : [e instanceof Error ? e.message : String(e)];
@@ -53,7 +56,30 @@ export class Refresher {
       await cache.write(view.id, result);
     }
     onChange({ type: "rows", viewId: view.id });
+    for (const id of spread) onChange(id === BOARD_CACHE_ID ? { type: "board" } : { type: "rows", viewId: id });
     return result;
+  }
+
+  /** Copies just-fetched tickets over older copies of the same keys in the other views' and the board's caches. */
+  private async spreadFresh(sourceId: string, tickets: Ticket[]): Promise<string[]> {
+    const { cache, getViews } = this.deps;
+    const fresh = new Map(tickets.map((t) => [t.key, t]));
+    const ids = [...(await getViews()).map((v) => v.id), BOARD_CACHE_ID].filter((id) => id !== sourceId);
+    const changedIds: string[] = [];
+    for (const id of ids) {
+      const c = await cache.read(id);
+      let changed = false;
+      const next = c.tickets.map((t) => {
+        const f = fresh.get(t.key);
+        if (!f || JSON.stringify(f) === JSON.stringify(t)) return t;
+        changed = true;
+        return f;
+      });
+      if (!changed) continue;
+      await cache.write(id, { ...c, tickets: next });
+      changedIds.push(id);
+    }
+    return changedIds;
   }
 
   private async ensureIdentities(tickets: Ticket[]): Promise<void> {
