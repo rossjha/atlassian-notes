@@ -1,5 +1,5 @@
 import type { BoardOp, BoardResponse, ColumnsConfig, Filters, LiveEvent, ReadingConfig, ReadingItem, Row, View } from "../shared/types.ts";
-import { icon, linkIcon, refreshButton } from "./icons.ts";
+import { icon, linkIcon, refreshButton, type IconName } from "./icons.ts";
 import { confirmDialog, themePickerButton, viewSettingsButton } from "./viewMenu.ts";
 import { applyFilters, sortRows } from "../shared/rowOps.ts";
 import { api, type Orphan } from "./api.ts";
@@ -712,10 +712,10 @@ function renderChrome(): void {
     keywordInput.disabled = locked;
     syncKeywordClear();
     const mode = viewMode(view.id);
-    const modeBtn = (m: "tickets" | "analysis", label: string) =>
-      h("button", { type: "button", "aria-pressed": String(mode === m), onclick: () => { if (mode !== m) setViewMode(view.id, m); } }, label);
+    const modeBtn = (m: "tickets" | "analysis", label: string, ic: IconName) =>
+      h("button", { type: "button", title: label, "aria-label": label, "aria-pressed": String(mode === m), onclick: () => { if (mode !== m) setViewMode(view.id, m); } }, icon(ic, "view-mode-icon"));
     headerEl.append(
-      h("div", { class: "view-mode", role: "group", "aria-label": "Show tickets or analysis" }, modeBtn("tickets", "Tickets"), modeBtn("analysis", "Analysis")),
+      h("div", { class: "view-mode", role: "group", "aria-label": "Show tickets or analysis" }, modeBtn("tickets", "Tickets", "tableCells"), modeBtn("analysis", "Analysis", "chartBar")),
       h("div", { class: "jql-field" },
         icon("jira", "jql-icon brand-jira"),
         jql,

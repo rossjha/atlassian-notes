@@ -532,7 +532,8 @@ nav.tabs { view-transition-name: an-tabs; }
 @layer components {
   /* View analysis (src/web/analysis.ts). Colours come from the theme's chart tokens through --c. */
   .view-mode { display: inline-flex; flex: none; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
-  .view-mode button { padding: 0 0.6rem; height: 22px; font-size: 12px; color: var(--muted); background: none; cursor: pointer; }
+  .view-mode button { display: inline-flex; align-items: center; padding: 0 0.45rem; height: 22px; color: var(--muted); background: none; cursor: pointer; }
+  .view-mode-icon { width: 15px; height: 15px; }
   .view-mode button:hover { color: var(--fg); }
   .view-mode button[aria-pressed="true"] { color: var(--fg); background: var(--surface-2); box-shadow: inset 0 -2px 0 var(--accent); }
   .fb-drill { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0 0.25rem 0 0.5rem; font-size: 12px; border: 1px solid var(--accent); border-radius: var(--r-sm); color: var(--fg); background: color-mix(in srgb, var(--accent) 12%, transparent); }
