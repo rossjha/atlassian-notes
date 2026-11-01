@@ -1,3 +1,5 @@
+> **Archived.** atlassian-notes now lives in the `apps/atlassian-notes` folder of [rossjha/tools](https://github.com/rossjha/tools), which is private for now. This repo is no longer updated.
+
 # atlassian-notes
 
 A small local web app for refining Jira tickets privately. It pulls tickets from Jira (read-only) into tabbed table views and lets you keep your own markdown notes beside each one, plus notes written by a Claude Code grooming skill. Notes are plain files on your disk. Nobody else sees them.
